@@ -2,17 +2,28 @@
 
 from __future__ import annotations
 
+import argparse
 import random
 import time
 
 from agenttrace import Tracer
+from agenttrace.exporters.api import APIExporter
 from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.span import SpanType
 from agenttrace.tracer import RunStatus
 from agenttrace.wrappers import trace_llm, trace_tool
 
-tracer = Tracer()
-tracer.set_exporter(JSONLExporter("data/research_traces.jsonl", buffer_size=1))
+
+def setup_tracer(exporter_type: str = "api") -> Tracer:
+    tracer = Tracer()
+    if exporter_type == "api":
+        tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api/traces", buffer_size=1))
+    else:
+        tracer.set_exporter(JSONLExporter("data/research_traces.jsonl", buffer_size=1))
+    return tracer
+
+
+tracer = setup_tracer()
 
 
 @trace_tool(tracer, tool_name="web_search")
@@ -130,10 +141,18 @@ def run_research_agent(query: str) -> None:
             print(f"  - {q}")
 
     tracer.flush()
-    print("\nTrace exported to data/research_traces.jsonl")
-    print("Start the server: cd server && uvicorn app.main:app --reload")
-    print("Open dashboard: cd dashboard && npm run dev")
+    exporter_name = "API server" if isinstance(tracer._exporter, APIExporter) else "JSONL file"
+    print(f"\nTrace exported via {exporter_name}")
+    print("Dashboard: http://localhost:3000")
+    print("API docs:  http://localhost:8000/docs")
 
 
 if __name__ == "__main__":
-    run_research_agent("quantum computing")
+    parser = argparse.ArgumentParser(description="AgentTrace research agent example")
+    parser.add_argument("--query", default="quantum computing", help="Research query")
+    parser.add_argument("--exporter", choices=["api", "jsonl"], default="api",
+                        help="Export target: api (default) sends to server; jsonl writes to file")
+    args = parser.parse_args()
+
+    tracer = setup_tracer(args.exporter)
+    run_research_agent(args.query)

@@ -44,6 +44,7 @@ class APIExporter(BaseExporter):
         self._api_base_url = self._normalize_api_base_url(endpoint)
         self._runs_url = f"{self._api_base_url}/runs"
         self._traces_url = f"{self._api_base_url}/traces"
+        self._traces_batch_url = f"{self._api_base_url}/traces/batch"
         self._buffer_size = buffer_size
         self._max_retries = max_retries
         self._timeout = timeout
@@ -121,12 +122,15 @@ class APIExporter(BaseExporter):
         self._run_buffer.clear()
 
     def _flush_spans(self) -> None:
-        """Send all buffered span data to the server."""
+        """Send all buffered span data to the server via batch endpoint."""
         if not self._span_buffer:
             return
 
-        for span_data in self._span_buffer:
-            self._send_request(self._traces_url, self._span_payload(span_data))
+        payloads = [self._span_payload(s) for s in self._span_buffer]
+        if len(payloads) == 1:
+            self._send_request(self._traces_url, payloads[0])
+        else:
+            self._send_request(self._traces_batch_url, payloads)
 
         self._span_buffer.clear()
 

@@ -65,8 +65,6 @@ async def test_run_diff_flow(client: AsyncClient) -> None:
             "name": "run_for_diff_1",
             "status": "completed",
             "start_time": datetime.now(timezone.utc).isoformat(),
-            "total_cost": 0.01,
-            "total_tokens": 100,
         },
     )
     run1_id = run1_resp.json()["id"]
@@ -77,8 +75,6 @@ async def test_run_diff_flow(client: AsyncClient) -> None:
             "name": "run_for_diff_2",
             "status": "completed",
             "start_time": datetime.now(timezone.utc).isoformat(),
-            "total_cost": 0.02,
-            "total_tokens": 200,
         },
     )
     run2_id = run2_resp.json()["id"]

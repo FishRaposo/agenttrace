@@ -73,6 +73,7 @@ export interface TraceResponse {
   id: string;
   run_id: string;
   span_id: string;
+  parent_span_id: string | null;
   span_type: SpanType;
   name: string;
   input_data: unknown;
@@ -92,6 +93,56 @@ export interface Stats {
   total_cost: number;
   total_tokens: number;
   avg_duration_ms: number;
+}
+
+export interface CostSummary {
+  total_cost: number;
+  total_tokens: number;
+  total_spans: number;
+  by_provider: Record<string, number>;
+  by_model: Record<string, number>;
+  by_feature: Record<string, number>;
+}
+
+export interface CostTimeseries {
+  granularity: string;
+  data: Array<{
+    bucket: string;
+    cost: number;
+    tokens: number;
+    spans: number;
+  }>;
+}
+
+export interface ModelCostBreakdown {
+  model: string;
+  total_cost: number;
+  total_tokens: number;
+  span_count: number;
+  avg_latency_ms: number;
+}
+
+export interface Budget {
+  id: string;
+  name: string;
+  scope: string;
+  scope_value: string | null;
+  limit_usd: number;
+  period: string;
+  alert_threshold_pct: number;
+  created_at: string;
+}
+
+export interface BudgetStatus {
+  budget_id: string;
+  name: string;
+  limit_usd: number;
+  current_cost: number;
+  remaining: number;
+  percent_used: number;
+  alert_triggered: boolean;
+  breached: boolean;
+  projected_monthly: number | null;
 }
 
 export interface HealthResponse {

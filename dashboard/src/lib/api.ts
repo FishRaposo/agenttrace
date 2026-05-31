@@ -10,6 +10,11 @@ import type {
   HealthResponse,
   RunDiff,
   ReplayData,
+  CostSummary,
+  CostTimeseries,
+  ModelCostBreakdown,
+  Budget,
+  BudgetStatus,
 } from "@/types";
 
 const API_BASE_URL: string =
@@ -85,4 +90,66 @@ export async function diffRuns(runId1: string, runId2: string): Promise<RunDiff>
 
 export async function getReplayData(runId: string): Promise<ReplayData> {
   return fetchApi<ReplayData>(`/api/replay/runs/${runId}`);
+}
+
+// Cost analytics
+export async function fetchCostSummary(): Promise<CostSummary> {
+  return fetchApi<CostSummary>("/api/costs/summary");
+}
+
+export async function fetchCostTimeseries(
+  granularity: string = "day",
+  days: number = 30
+): Promise<CostTimeseries> {
+  return fetchApi<CostTimeseries>(`/api/costs/timeseries?granularity=${granularity}&days=${days}`);
+}
+
+export async function fetchCostByModel(): Promise<ModelCostBreakdown[]> {
+  return fetchApi<ModelCostBreakdown[]>("/api/costs/by-model");
+}
+
+export async function fetchCostByProvider(): Promise<{ provider: string; total_cost: number; span_count: number }[]> {
+  return fetchApi<{ provider: string; total_cost: number; span_count: number }[]>("/api/costs/by-provider");
+}
+
+export async function fetchCostByFeature(): Promise<{ feature: string; total_cost: number; span_count: number }[]> {
+  return fetchApi<{ feature: string; total_cost: number; span_count: number }[]>("/api/costs/by-feature");
+}
+
+export async function fetchTopExpensiveRuns(limit: number = 10): Promise<{ id: string; name: string; total_cost: number; total_tokens: number; span_count: number; status: string; start_time: string }[]> {
+  return fetchApi<{ id: string; name: string; total_cost: number; total_tokens: number; span_count: number; status: string; start_time: string }[]>(`/api/costs/top-runs?limit=${limit}`);
+}
+
+export async function fetchCostProjection(): Promise<{ trailing_7d_cost: number; trailing_30d_cost: number; daily_burn: number; monthly_projection: number }> {
+  return fetchApi<{ trailing_7d_cost: number; trailing_30d_cost: number; daily_burn: number; monthly_projection: number }>("/api/costs/projection");
+}
+
+// Budgets
+export async function fetchBudgets(): Promise<Budget[]> {
+  return fetchApi<Budget[]>("/api/budgets");
+}
+
+export async function fetchBudgetStatus(budgetId: string): Promise<BudgetStatus> {
+  return fetchApi<BudgetStatus>(`/api/budgets/${budgetId}/status`);
+}
+
+// Live tail (SSE)
+export function streamTraces(callback: (trace: TraceResponse) => void): () => void {
+  const url = `${API_BASE_URL}/api/stream/traces`;
+  const eventSource = new EventSource(url);
+
+  eventSource.onmessage = (event) => {
+    try {
+      const data = JSON.parse(event.data);
+      callback(data as TraceResponse);
+    } catch {
+      // ignore parse errors
+    }
+  };
+
+  eventSource.onerror = () => {
+    eventSource.close();
+  };
+
+  return () => eventSource.close();
 }

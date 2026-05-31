@@ -5,7 +5,10 @@ Tracks LLM costs per trace, workflow, and feature.
 
 from __future__ import annotations
 
+import json
+import os
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 
 
@@ -31,6 +34,7 @@ class CostTracker:
     - Per-workflow cost aggregation
     - Model cost comparison
     - Budget threshold alerts
+    - External pricing file override
     """
     
     # Provider pricing per 1K tokens
@@ -38,18 +42,49 @@ class CostTracker:
         "openai": {
             "gpt-4": {"prompt": 0.03, "completion": 0.06},
             "gpt-4-turbo": {"prompt": 0.01, "completion": 0.03},
+            "gpt-4o": {"prompt": 0.005, "completion": 0.015},
+            "gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
             "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002},
         },
         "anthropic": {
             "claude-3-opus": {"prompt": 0.015, "completion": 0.075},
             "claude-3-sonnet": {"prompt": 0.003, "completion": 0.015},
+            "claude-3-5-sonnet": {"prompt": 0.003, "completion": 0.015},
             "claude-3-haiku": {"prompt": 0.00025, "completion": 0.00125},
         },
     }
     
     def __init__(self) -> None:
-        """Initialize cost tracker."""
+        """Initialize cost tracker with optional external pricing override."""
         self.records: list[CostRecord] = []
+        self._pricing = dict(self.PRICING)
+        self._load_external_pricing()
+    
+    def _load_external_pricing(self) -> None:
+        """Load pricing from external JSON/YAML file if available."""
+        paths = [
+            os.getenv("AGENTTRACE_PRICING_FILE"),
+            "agenttrace_pricing.json",
+            "agenttrace_pricing.yaml",
+        ]
+        for path_str in paths:
+            if not path_str:
+                continue
+            path = Path(path_str)
+            if path.exists():
+                try:
+                    with open(path, "r") as f:
+                        data = json.load(f)
+                    if isinstance(data, dict):
+                        self._pricing.update(data)
+                except (json.JSONDecodeError, OSError):
+                    pass
+                break
+    
+    @property
+    def pricing(self) -> dict[str, dict[str, dict[str, float]]]:
+        """Return current pricing table (includes external overrides)."""
+        return self._pricing
     
     def get_pricing(self, provider: str, model: str) -> dict[str, float] | None:
         """Get pricing for a provider/model.
@@ -57,7 +92,7 @@ class CostTracker:
         Returns:
             Dict with 'prompt' and 'completion' per-1k-token rates, or None.
         """
-        provider_pricing = self.PRICING.get(provider, {})
+        provider_pricing = self._pricing.get(provider, {})
         return provider_pricing.get(model)
 
     def calculate_cost(

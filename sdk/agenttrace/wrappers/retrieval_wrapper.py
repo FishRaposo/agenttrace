@@ -3,18 +3,19 @@
 from __future__ import annotations
 
 import functools
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, ParamSpec, TypeVar
 
 from agenttrace.span import SpanType
 from agenttrace.tracer import Tracer
 
-F = TypeVar("F", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def trace_retrieval(
     tracer: Tracer,
     retriever_name: Optional[str] = None,
-) -> Callable[[F], F]:
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator that automatically traces retrieval operations.
 
     Creates a span for each call, recording the query, retrieved documents,
@@ -33,9 +34,9 @@ def trace_retrieval(
         ...     return [{"doc": "content"}]
     """
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             name = retriever_name or func.__name__
             span = tracer.start_span(
                 name=name,
@@ -48,14 +49,14 @@ def trace_retrieval(
             try:
                 result = func(*args, **kwargs)
                 span.end(output=result)
+                return result
             except Exception as e:
                 span.set_error(str(e))
                 raise
             finally:
-                tracer.end_span(span)
+                if span.end_time is None:
+                    tracer.end_span(span)
 
-            return result
-
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator

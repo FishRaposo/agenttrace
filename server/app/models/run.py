@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, model_validator
 from sqlalchemy import JSON, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.session import Base
+from app.db import Base
 
 
 class Run(Base):
@@ -44,12 +44,14 @@ class Run(Base):
     status: Mapped[str] = mapped_column(
         String(20), nullable=False, default="running"
     )
-    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     total_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     span_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     run_metadata: Mapped[Optional[dict]] = mapped_column("run_metadata", JSON, nullable=True)
+    workflow_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    feature: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
 
 
 class RunCreate(BaseModel):
@@ -73,7 +75,7 @@ class RunCreate(BaseModel):
     name: str = Field(..., description="Human-readable run name")
     status: str = Field("running", description="Initial run status")
     start_time: datetime = Field(
-        default_factory=datetime.utcnow, description="Run start time"
+        default_factory=lambda: datetime.now(timezone.utc), description="Run start time"
     )
     end_time: Optional[datetime] = Field(None, description="Run end time")
     total_cost: float = Field(0.0, description="Total cost in USD")
@@ -84,6 +86,8 @@ class RunCreate(BaseModel):
         description="Run metadata",
         validation_alias=AliasChoices("metadata", "run_metadata"),
     )
+    workflow_id: Optional[str] = Field(None, description="Workflow identifier")
+    feature: Optional[str] = Field(None, description="Feature or component name")
 
 
 class RunResponse(BaseModel):
@@ -102,6 +106,8 @@ class RunResponse(BaseModel):
     total_tokens: int
     span_count: int
     metadata: Optional[dict[str, Any]]
+    workflow_id: Optional[str] = None
+    feature: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
@@ -120,6 +126,8 @@ class RunResponse(BaseModel):
                 "total_tokens": data.total_tokens,
                 "span_count": data.span_count,
                 "metadata": data.run_metadata,
+                "workflow_id": data.workflow_id,
+                "feature": data.feature,
             }
         return data
 

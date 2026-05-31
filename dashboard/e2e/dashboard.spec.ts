@@ -51,4 +51,39 @@ test.describe("AgentTrace Dashboard E2E Tests", () => {
       await expect(page.locator('button:has-text("Next")')).toHaveCount(0);
     }
   });
+
+  test("costs page loads with analytics", async ({ page }) => {
+    await page.click("text=Costs");
+    await expect(page).toHaveURL(/\/costs/);
+    await expect(page.locator("h2")).toContainText("Cost Analytics");
+    // Budget bars or charts should be present
+    const chart = page.locator("[data-testid='cost-chart'], canvas, svg").first();
+    await expect(chart).toBeVisible({ timeout: 5000 });
+  });
+
+  test("live tail page loads and connects", async ({ page }) => {
+    await page.click("text=Live");
+    await expect(page).toHaveURL(/\/live/);
+    await expect(page.locator("h2")).toContainText("Live Tail");
+    await expect(page.locator("text=Connecting")).toBeVisible();
+    // After a short delay, connection status should update
+    await page.waitForTimeout(1000);
+    const status = page.locator("text=/Connected|Waiting for traces/");
+    await expect(status).toBeVisible({ timeout: 5000 });
+  });
+
+  test("run detail page shows timeline and diff", async ({ page }) => {
+    // Navigate to runs and click first run if available
+    await page.click("text=Runs");
+    const firstRun = page.locator("[data-testid='run-row']").first();
+    if (await firstRun.isVisible()) {
+      await firstRun.click();
+      await expect(page).toHaveURL(/\/runs\//);
+      // Timeline should be visible
+      await expect(page.locator("text=Timeline")).toBeVisible();
+      // Diff tab should be present
+      await page.click("text=Diff");
+      await expect(page.locator("text=Select runs to compare")).toBeVisible();
+    }
+  });
 });

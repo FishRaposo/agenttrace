@@ -1,18 +1,23 @@
 """Models package — SQLAlchemy models and Pydantic schemas."""
 
+from app.models.budget import Budget, BudgetCreate, BudgetResponse, BudgetStatusResponse
 from app.models.run import Run, RunCreate, RunResponse, RunListResponse
-from app.models.span import SpanEntry, SpanCreate, SpanResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
+from app.models.user import User, UserCreate, UserResponse
 
 __all__ = [
+    "Budget",
+    "BudgetCreate",
+    "BudgetResponse",
+    "BudgetStatusResponse",
     "Run",
     "RunCreate",
     "RunResponse",
     "RunListResponse",
-    "SpanEntry",
-    "SpanCreate",
-    "SpanResponse",
     "Trace",
     "TraceCreate",
     "TraceResponse",
+    "User",
+    "UserCreate",
+    "UserResponse",
 ]

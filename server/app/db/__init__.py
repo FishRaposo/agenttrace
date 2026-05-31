@@ -13,6 +13,9 @@ from app.config import settings
 engine = create_async_engine(
     settings.DATABASE_URL,
     echo=False,
+    pool_size=settings.DB_POOL_SIZE,
+    max_overflow=settings.DB_MAX_OVERFLOW,
+    pool_timeout=settings.DB_POOL_TIMEOUT,
 )
 
 async_session_factory = async_sessionmaker(
@@ -44,11 +47,25 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
 
 
 async def init_db() -> None:
-    """Initialize the database by creating all tables."""
+    """Initialize the database by creating all tables and seeding demo data."""
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         if engine.dialect.name == "sqlite":
             await conn.run_sync(_repair_sqlite_schema)
+
+    # Seed demo user if users table is empty
+    async with async_session_factory() as session:
+        from app.auth import get_password_hash
+        from app.models.user import User
+
+        result = await session.execute(select(User))
+        if result.scalar_one_or_none() is None:
+            demo = User(
+                username="admin",
+                hashed_password=get_password_hash("admin123"),
+            )
+            session.add(demo)
+            await session.commit()
 
 
 def _repair_sqlite_schema(sync_conn) -> None:

@@ -173,6 +173,56 @@ async def test_ingest_trace_accepts_sdk_span_payload(client: AsyncClient) -> Non
     assert data["metadata"] == {"tool_name": "web_search"}
 
 
+async def test_ingest_traces_batch(client: AsyncClient) -> None:
+    create_run = await client.post(
+        "/api/runs",
+        json={
+            "name": "batch_run",
+            "status": "running",
+            "start_time": datetime.now(timezone.utc).isoformat(),
+        },
+    )
+    run_id = create_run.json()["id"]
+
+    response = await client.post(
+        "/api/traces/batch",
+        json=[
+            {
+                "run_id": run_id,
+                "span_id": "span-batch-1",
+                "span_type": "llm_call",
+                "name": "call 1",
+                "start_time": datetime.now(timezone.utc).isoformat(),
+                "status": "completed",
+                "cost_usd": 0.001,
+                "token_usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+            },
+            {
+                "run_id": run_id,
+                "span_id": "span-batch-2",
+                "span_type": "tool_call",
+                "name": "call 2",
+                "start_time": datetime.now(timezone.utc).isoformat(),
+                "status": "completed",
+                "cost_usd": 0.002,
+                "token_usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+            },
+        ],
+    )
+    assert response.status_code == 201
+    data = response.json()
+    assert len(data) == 2
+    assert data[0]["name"] == "call 1"
+    assert data[1]["name"] == "call 2"
+
+    # Verify run aggregates were updated
+    run_resp = await client.get(f"/api/runs/{run_id}")
+    run_data = run_resp.json()
+    assert run_data["total_cost"] == 0.003
+    assert run_data["total_tokens"] == 45
+    assert run_data["span_count"] == 2
+
+
 async def test_list_traces_by_run(client: AsyncClient) -> None:
     response = await client.get("/api/traces")
     assert response.status_code == 200

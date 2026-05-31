@@ -74,16 +74,19 @@ class Tracer:
     The Tracer manages the lifecycle of runs and spans, coordinates
     exporters, and provides context-manager support for ergonomic usage.
 
+    Multiple tracer instances are supported — create one per workflow
+    or use a single global tracer as needed.
+
     Attributes:
         exporter: The configured exporter for trace data.
     """
 
-    _instance: Optional[Tracer] = None
-
-    def __init__(self) -> None:
+    def __init__(self, sample_rate: float = 1.0) -> None:
         self._exporter: Optional[BaseExporter] = None
         self._current_run: Optional[_RunState] = None
         self._span_stack: list[Span] = []
+        self._sample_rate = max(0.0, min(1.0, sample_rate))
+        self._sampled: bool = True
 
     def set_exporter(self, exporter: BaseExporter) -> None:
         """Set the exporter used to write trace data.
@@ -113,14 +116,40 @@ class Tracer:
             raise RuntimeError("A run is already in progress. End the current run first.")
 
         run_id = str(uuid.uuid4())
+        # Head-based deterministic sampling
+        self._sampled = self._is_sampled(run_id)
         run_state = _RunState(run_id=run_id, name=name, metadata=metadata, correlation_id=correlation_id)
         self._current_run = run_state
         RunContext.set_current_run(run_id, metadata)
+        if correlation_id:
+            RunContext.set_current_correlation_id(correlation_id)
 
-        if self._exporter is not None:
+        if self._exporter is not None and self._sampled:
             self._exporter.export_run(run_state.to_dict())
 
         return _RunContext(tracer=self, run_state=run_state)
+
+    def _is_sampled(self, run_id: str) -> bool:
+        """Deterministic head-based sampling decision.
+
+        Uses the first 8 hex chars of an MD5 hash of the run ID
+        to generate a uniform value in [0, 1). Traces are kept when
+        this value is less than the configured sample_rate.
+
+        Args:
+            run_id: The run identifier.
+
+        Returns:
+            True if the run should be traced, False otherwise.
+        """
+        if self._sample_rate >= 1.0:
+            return True
+        if self._sample_rate <= 0.0:
+            return False
+        import hashlib
+        digest = hashlib.md5(run_id.encode()).hexdigest()
+        value = int(digest[:8], 16) / 0xFFFFFFFF
+        return value < self._sample_rate
 
     def start_span(
         self,
@@ -181,7 +210,7 @@ class Tracer:
             self._span_stack[-1] if self._span_stack else None
         )
 
-        if self._exporter is not None:
+        if self._exporter is not None and self._sampled:
             self._exporter.export_span(span.to_dict())
 
     def end_run(self, status: RunStatus = RunStatus.COMPLETED) -> None:
@@ -206,7 +235,7 @@ class Tracer:
         self._span_stack.clear()
         RunContext.clear()
 
-        if self._exporter is not None:
+        if self._exporter is not None and self._sampled:
             self._exporter.export_run(self._current_run.to_dict())
 
         self._current_run = None
@@ -215,6 +244,38 @@ class Tracer:
         """Flush any buffered trace data to the exporter."""
         if self._exporter is not None:
             self._exporter.flush()
+
+    def add_event(self, event_type: str, payload: dict[str, Any]) -> None:
+        """Log an event within the current run.
+
+        Events are attached to the current span if one is active,
+        otherwise to the run's metadata trail.
+
+        Args:
+            event_type: Event identifier.
+            payload: Event data.
+        """
+        if self._current_run is None:
+            return
+
+        from datetime import datetime, timezone
+        event = {
+            "event_type": event_type,
+            "timestamp": datetime.now(timezone.utc).isoformat(),
+            "payload": payload,
+        }
+
+        # Attach to current span if active
+        if self._span_stack:
+            span = self._span_stack[-1]
+            if span.metadata is None:
+                span.metadata = {}
+            span.metadata.setdefault("events", []).append(event)
+        else:
+            # Attach to run metadata
+            if self._current_run.metadata is None:
+                self._current_run.metadata = {}
+            self._current_run.metadata.setdefault("events", []).append(event)
 
     def run(self, name: str, metadata: Optional[dict[str, Any]] = None, correlation_id: Optional[str] = None) -> _RunContext:
         """Alias for start_run() for ergonomic usage.

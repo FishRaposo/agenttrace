@@ -15,17 +15,19 @@ cp .env.example .env
 
 | Variable | Purpose |
 |----------|---------|
-| `DATABASE_URL` | PostgreSQL connection |
-| `OPENAI_API_KEY` | LLM API (optional) |
+| `DATABASE_URL` | Database connection (SQLite or PostgreSQL) |
+| `OPENAI_API_KEY` | LLM API (optional, only for real mode) |
+| `ANTHROPIC_API_KEY` | Anthropic API (optional, only for real mode) |
 
-### API Key Security
+### Authentication
 
-- Keys are hashed with bcrypt before storage
-- Keys can be revoked via admin dashboard
-- Rate limiting per API key
+- User passwords are hashed with bcrypt before storage
+- JWT tokens are used for API authentication
+- Demo user (`admin` / `admin123`) is seeded on first startup
 
 ## Security Checklist
 
-- [ ] Keys use `gk-` prefix convention
-- [ ] Dashboard protected with auth
+- [ ] Change default demo password in production
+- [ ] Use PostgreSQL instead of SQLite for production
 - [ ] Database not exposed publicly
+- [ ] CORS origins restricted to known domains

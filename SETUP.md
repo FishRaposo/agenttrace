@@ -2,23 +2,26 @@
 
 ## Prerequisites
 
-- Python 3.11+
-- Node.js 18+ (for dashboard)
+- Python 3.12+
+- Node.js 20+ (for dashboard)
+- Docker (optional, for PostgreSQL)
 
 ## SDK Setup
 
 ```bash
 cd sdk
-pip install -e .
+pip install -e ".[dev]"
 ```
 
-## Backend Setup
+## Server Setup
 
 ```bash
-cd backend
+cd server
 pip install -r requirements.txt
-uvicorn main:app --reload
+uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 ```
+
+The server auto-initializes an SQLite database at `./data/agenttrace.db`.
 
 ## Dashboard Setup
 
@@ -31,18 +34,25 @@ npm run dev
 ## Quick Test
 
 ```python
-from agenttrace import Tracer, start_span
+from agenttrace import Tracer
+from agenttrace.exporters.api_exporter import APIExporter
 
 tracer = Tracer()
-with start_span("test_operation") as span:
-    span.set_tag("model", "gpt-4")
-    # ... your code ...
+tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api"))
 
-# Export to backend
-import requests
-requests.post("http://localhost:8000/api/traces", json=tracer.export())
+with tracer.run("test_operation"):
+    span = tracer.start_span("llm_call")
+    span.input_data = {"prompt": "Hello"}
+    span.output_data = {"response": "Hi!"}
+    span.end()
+    tracer.end_span(span)
+
+tracer.flush()
 ```
 
-## Prometheus
+## Docker Compose
 
-Metrics available at: http://localhost:8000/metrics
+```bash
+cp .env.example .env
+docker compose up --build
+```

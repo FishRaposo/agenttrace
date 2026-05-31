@@ -123,3 +123,15 @@ async def broadcast_metrics(metrics_data: dict[str, Any]) -> None:
     for ws in disconnected:
         if ws in connections.get("metrics", []):
             connections["metrics"].remove(ws)
+
+
+async def close_all_connections() -> None:
+    """Gracefully close all active WebSocket connections on shutdown."""
+    for channel in list(connections.keys()):
+        for ws in list(connections.get(channel, [])):
+            try:
+                await ws.send_json({"type": "shutdown", "message": "Server is shutting down"})
+                await ws.close()
+            except Exception:
+                pass
+        connections[channel].clear()

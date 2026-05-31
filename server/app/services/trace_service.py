@@ -26,7 +26,7 @@ class TraceService:
         self._session = session
 
     async def ingest_trace(self, trace_data: TraceCreate) -> Trace:
-        """Ingest a new trace record into the database.
+        """Ingest a new trace record and update run stats incrementally.
 
         Args:
             trace_data: Validated trace creation payload.
@@ -38,6 +38,7 @@ class TraceService:
             id=str(uuid.uuid4()),
             run_id=trace_data.run_id,
             span_id=trace_data.span_id,
+            parent_span_id=trace_data.parent_span_id,
             span_type=trace_data.span_type,
             name=trace_data.name,
             input_data=trace_data.input_data,
@@ -50,10 +51,94 @@ class TraceService:
             token_usage=trace_data.token_usage,
             status=trace_data.status,
             error=trace_data.error,
+            model=trace_data.model,
+            provider=trace_data.provider,
+            feature=trace_data.feature,
         )
         self._session.add(trace)
         await self._session.flush()
+
+        # Increment run stats atomically
+        await self._increment_run_stats(
+            run_id=trace_data.run_id,
+            cost=trace_data.cost_usd or 0.0,
+            tokens=(trace_data.token_usage or {}).get("total_tokens", 0),
+        )
         return trace
+
+    async def ingest_traces_batch(self, trace_data_list: list[TraceCreate]) -> list[Trace]:
+        """Ingest multiple traces and update run stats incrementally.
+
+        Args:
+            trace_data_list: List of validated trace creation payloads.
+
+        Returns:
+            The persisted Trace records.
+        """
+        traces: list[Trace] = []
+        run_deltas: dict[str, tuple[float, int]] = {}
+
+        for trace_data in trace_data_list:
+            trace = Trace(
+                id=str(uuid.uuid4()),
+                run_id=trace_data.run_id,
+                span_id=trace_data.span_id,
+                parent_span_id=trace_data.parent_span_id,
+                span_type=trace_data.span_type,
+                name=trace_data.name,
+                input_data=trace_data.input_data,
+                output_data=trace_data.output_data,
+                trace_metadata=trace_data.metadata,
+                start_time=trace_data.start_time,
+                end_time=trace_data.end_time,
+                duration_ms=trace_data.duration_ms,
+                cost_usd=trace_data.cost_usd,
+                token_usage=trace_data.token_usage,
+                status=trace_data.status,
+                error=trace_data.error,
+                model=trace_data.model,
+                provider=trace_data.provider,
+                feature=trace_data.feature,
+            )
+            self._session.add(trace)
+            traces.append(trace)
+
+            # Aggregate deltas per run
+            cost = trace_data.cost_usd or 0.0
+            tokens = (trace_data.token_usage or {}).get("total_tokens", 0)
+            prev_cost, prev_tokens, prev_count = run_deltas.get(trace_data.run_id, (0.0, 0, 0))
+            run_deltas[trace_data.run_id] = (prev_cost + cost, prev_tokens + tokens, prev_count + 1)
+
+        await self._session.flush()
+
+        # Apply incremental updates per run
+        for run_id, (cost_delta, token_delta, count_delta) in run_deltas.items():
+            await self._increment_run_stats(run_id, cost_delta, token_delta, count_delta)
+
+        return traces
+
+    async def _increment_run_stats(
+        self, run_id: str, cost: float, tokens: int, count: int = 1
+    ) -> None:
+        """Atomically increment run aggregate stats.
+
+        Args:
+            run_id: The run to update.
+            cost: Cost to add.
+            tokens: Tokens to add.
+            count: Span count to add (default 1).
+        """
+        stmt = (
+            select(Run)
+            .where(Run.id == run_id)
+            .with_for_update()
+        )
+        result = await self._session.execute(stmt)
+        run = result.scalar_one_or_none()
+        if run is not None:
+            run.total_cost += cost
+            run.total_tokens += tokens
+            run.span_count += count
 
     async def get_run_traces(self, run_id: str) -> list[Trace]:
         """Retrieve all traces for a given run.

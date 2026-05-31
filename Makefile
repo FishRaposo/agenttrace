@@ -53,10 +53,12 @@ setup: install
 demo:
 	@echo "🚀 Starting AgentTrace demo..."
 	docker compose up -d
-	@echo "⏳ Waiting for services..."
-	@sleep 3
-	@echo "📊 Running sample trace..."
-	cd examples && $(PYTHON) research_agent.py || true
+	@echo "⏳ Waiting for services to be healthy..."
+	@python -c "import time, urllib.request; \
+		[urllib.request.urlopen('http://localhost:8000/health') and exit(0) \
+		for _ in range(30) if (time.sleep(1) or True)]" || echo "Warning: server not responding, continuing anyway"
+	@echo "📊 Seeding demo data..."
+	$(PYTHON) scripts/seed_demo.py --endpoint http://localhost:8000/api
 	@echo "✅ Demo ready!"
 	@echo "   Dashboard: http://localhost:3000"
 	@echo "   API:       http://localhost:8000"

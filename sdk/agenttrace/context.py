@@ -12,6 +12,9 @@ _current_span: ContextVar[Optional[Span]] = ContextVar("current_span", default=N
 _current_run_metadata: ContextVar[Optional[dict]] = ContextVar(
     "current_run_metadata", default=None
 )
+_current_correlation_id: ContextVar[Optional[str]] = ContextVar(
+    "current_correlation_id", default=None
+)
 
 
 class RunContext:
@@ -72,8 +75,27 @@ class RunContext:
         return _current_span.get()
 
     @staticmethod
+    def set_current_correlation_id(correlation_id: str | None) -> None:
+        """Set the current correlation ID for distributed tracing.
+
+        Args:
+            correlation_id: Correlation ID string, or None to clear.
+        """
+        _current_correlation_id.set(correlation_id)
+
+    @staticmethod
+    def get_current_correlation_id() -> Optional[str]:
+        """Get the current correlation ID.
+
+        Returns:
+            The current correlation ID, or None.
+        """
+        return _current_correlation_id.get()
+
+    @staticmethod
     def clear() -> None:
         """Clear all context state."""
         _current_run_id.set(None)
         _current_span.set(None)
         _current_run_metadata.set(None)
+        _current_correlation_id.set(None)

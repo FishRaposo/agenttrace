@@ -53,6 +53,7 @@ async def client(db_session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
 
     async def override_get_session() -> AsyncGenerator[AsyncSession, None]:
         yield db_session
+        await db_session.commit()
 
     app.dependency_overrides[get_session] = override_get_session
 

@@ -141,12 +141,16 @@ async def get_run(
 @router.get("/runs/{run_id}/spans", response_model=list[TraceResponse])
 async def get_run_spans(
     run_id: str,
+    limit: int = Query(50, ge=1, le=200, description="Maximum results"),
+    offset: int = Query(0, ge=0, description="Result offset"),
     session: AsyncSession = Depends(get_session),
 ) -> list[Trace]:
-    """Get all trace spans for a specific run.
+    """Get trace spans for a specific run with pagination.
 
     Args:
         run_id: The run identifier.
+        limit: Maximum number of results.
+        offset: Result offset for pagination.
         session: Async database session.
 
     Returns:
@@ -156,6 +160,8 @@ async def get_run_spans(
         select(Trace)
         .where(Trace.run_id == run_id)
         .order_by(Trace.start_time.asc())
+        .limit(limit)
+        .offset(offset)
     )
     result = await session.execute(stmt)
     return list(result.scalars().all())

@@ -1,12 +1,16 @@
 # AgentTrace
 
-[![Tests](https://img.shields.io/badge/tests-passing-brightgreen)]() [![Coverage](https://img.shields.io/badge/coverage-90%25-brightgreen)]() [![Python](https://img.shields.io/badge/python-3.11-blue)]() [![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi)]() [![Next.js](https://img.shields.io/badge/Next.js-000?logo=next.js)]()
+[![CI](https://github.com/FishRaposo/agenttrace/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/FishRaposo/agenttrace/actions/workflows/ci.yml)
+[![Python](https://img.shields.io/badge/python-3.12-blue)]()
+[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi)]()
+[![Next.js](https://img.shields.io/badge/Next.js-000?logo=next.js)]()
+[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)]()
 
-**OpenTelemetry-compatible observability for AI agents.**
+**OpenTelemetry-compatible observability + FinOps for AI agents.**
 
-Trace LLM calls, tool executions, and multi-step workflows with cost tracking, token usage, and replay capabilities.
+Trace LLM calls, tool executions, and multi-step workflows with **automatic cost tracking**, **budget alerts**, **live tail**, and **waterfall replay**.
 
-[Quick Demo](#quick-demo) • [Architecture](#architecture) • [SDK Guide](#quickstart-local-development)
+[Quick Demo](#quick-demo) • [Architecture](#architecture) • [SDK Guide](#quickstart-local-development) • [Deploy](#deployment)
 
 ---
 
@@ -42,17 +46,59 @@ AgentTrace solves this by providing a complete execution trace with rich metadat
 
 ## Architecture
 
+```
+┌─────────────────┐     ┌──────────────┐     ┌──────────────────┐
+│  Agent Code     │────▶│  SDK         │────▶│  APIExporter     │
+│  (Your App)     │     │  Tracer      │     │  (HTTP / Batch)  │
+└─────────────────┘     └──────────────┘     └──────────────────┘
+                              │                        │
+                              │ trace_openai()         │
+                              │ trace_anthropic()      │
+                              │ trace_llm()            ▼
+                              │                 ┌──────────────┐
+                              │                 │  Server      │
+                              │                 │  FastAPI     │
+                              │                 │  SQLAlchemy  │
+                              │                 │  SQLite/PG   │
+                              │                 └──────────────┘
+                              │                        │
+                              │                        ▼
+                              │                 ┌──────────────┐
+                              │                 │  Dashboard   │
+                              │                 │  Next.js     │
+                              │                 │  Recharts    │
+                              │                 └──────────────┘
+                              │
+                              ▼
+                     ┌──────────────┐
+                     │  HybridLLM   │
+                     │  Client      │
+                     │  (sim / real)│
+                     └──────────────┘
+```
+
 AgentTrace consists of three components:
 
-1. **SDK** (`sdk/`): Python library for instrumenting agent code
-2. **Server** (`server/`): FastAPI application for ingesting, storing, and serving trace data
-3. **Dashboard** (`dashboard/`): Next.js UI for visualizing runs, spans, costs, and tokens
+1. **SDK** (`sdk/`): Python library with decorators (`trace_openai`, `trace_anthropic`, `trace_llm`), hybrid client, and distributed tracing
+2. **Server** (`server/`): FastAPI with cost analytics API, budget tracking, batch ingestion, WebSocket live tail
+3. **Dashboard** (`dashboard/`): Next.js with runs list, cost breakdown, live tail, budget status, waterfall replay
 
-### Data Flow
+### Feature Matrix
 
-```
-Agent Code → SDK → Exporter (JSONL/HTTP/OTLP) → Server (FastAPI, SQLAlchemy, SQLite/PostgreSQL) → Dashboard (Next.js)
-```
+| Feature | AgentTrace | LangSmith | Langfuse | Phoenix |
+|---------|-----------|-----------|----------|---------|
+| Open-source | ✅ | ❌ | ✅ | ✅ |
+| Self-hostable | ✅ | ❌ | ✅ | ✅ |
+| Cost tracking per span | ✅ | Partial | Partial | ❌ |
+| Budget alerts | ✅ | ❌ | ✅ | ❌ |
+| Live tail (SSE/WS) | ✅ | ❌ | ❌ | Partial |
+| Multi-agent correlation | ✅ | Partial | ❌ | ❌ |
+| Waterfall timeline | ✅ | Partial | Partial | Partial |
+| Prompt replay | ✅ | ❌ | ❌ | ❌ |
+| Run diffing | ✅ | ❌ | ❌ | ❌ |
+| Batch ingestion API | ✅ | ❌ | ❌ | ❌ |
+| Provider wrappers (OpenAI/Anthropic) | ✅ | ❌ | ❌ | ❌ |
+| Hybrid client (sim/real) | ✅ | ❌ | ❌ | ❌ |
 
 ## Quickstart (Local Development)
 
@@ -109,40 +155,69 @@ Use `APIExporter` instead of `JSONLExporter` when you want the example to ingest
 
 ## Example Workflow
 
+### Provider-Aware Wrappers (Recommended)
+
 ```python
-from agenttrace import Tracer, SpanType
-from agenttrace.exporters import APIExporter, JSONLExporter
-from agenttrace.wrappers import trace_tool, trace_llm
+from agenttrace import Tracer, trace_openai, trace_anthropic
+from agenttrace.exporters import APIExporter
 
-# Initialize tracer with exporter
+# Or use the Hybrid Client for zero-config demos
+from agenttrace import HybridLLMClient
+
 tracer = Tracer()
-tracer.set_exporter(JSONLExporter(path="./traces.jsonl"))
+tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api"))
 
-# Decorate tools
-@trace_tool(tracer)
-def web_search(query: str) -> dict:
-    # Simulate search
-    return {"results": [...]}
+client = HybridLLMClient(mode="sim", tracer=tracer)
 
-# Decorate LLM calls
-@trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
-def synthesize_findings(context: str) -> str:
-    # Call LLM
-    return "Summary of findings..."
+# Run with tracing
+with tracer.run("research_agent", workflow_id="research-pipeline"):
+    research = client.chat("openai", "gpt-4", messages=[
+        {"role": "user", "content": "Research AI observability trends"}
+    ])
+    summary = client.chat("anthropic", "claude-3-sonnet", messages=[
+        {"role": "user", "content": f"Summarize: {research.content}"}
+    ])
 
-# Run with tracing (with optional correlation ID for multi-agent workflows)
-with tracer.run("research_agent", correlation_id="workflow-123"):
-    results = web_search("AI agent debugging")
-    summary = synthesize_findings(str(results))
-
-# Flush to ensure data is written
 tracer.flush()
 ```
 
-To send the same trace data to the server, configure the exporter like this:
+### Manual Decorators
 
 ```python
-tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api"))
+from agenttrace import Tracer
+from agenttrace.wrappers import trace_tool, trace_llm
+
+tracer = Tracer()
+
+@trace_tool(tracer)
+def web_search(query: str) -> dict:
+    return {"results": [...]}
+
+@trace_llm(tracer, model="gpt-4", feature="summarization")
+def synthesize(context: str) -> str:
+    return "Summary..."
+
+with tracer.run("agent", correlation_id="workflow-123"):
+    results = web_search("AI debugging")
+    summary = synthesize(str(results))
+```
+
+### Multi-Agent with Correlation ID
+
+```python
+from agenttrace import Tracer, HybridLLMClient
+
+tracer = Tracer()
+correlation_id = tracer.generate_id()
+
+# Agent A (researcher)
+with tracer.start_run("researcher", metadata={"correlation_id": correlation_id}):
+    client = HybridLLMClient(tracer=tracer)
+    research = client.chat("openai", "gpt-4", messages=[{"role": "user", "content": "Research"}])
+
+# Agent B (summarizer) — same correlation_id links them in dashboard
+with tracer.start_run("summarizer", metadata={"correlation_id": correlation_id}):
+    summary = client.chat("anthropic", "claude-3", messages=[{"role": "user", "content": "Summarize"}])
 ```
 
 ## Key Design Decisions
@@ -250,53 +325,59 @@ cd server && pytest tests/ -v
 cd dashboard && npm run test:e2e
 ```
 
-## Deployment Notes
+## Deployment
+
+### Docker Compose (Recommended)
+
+```bash
+cp .env.example .env
+docker compose up --build
+```
+
+The server auto-migrates on first boot and seeds demo data if empty. Full guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+
+### Benchmarks
+
+Run on a local laptop (SQLite, single worker):
+
+```bash
+$ python scripts/benchmark.py
+AgentTrace Ingestion Benchmark
+==================================================
+[Single Trace] 100 sequential requests...
+  Throughput: 45 traces/sec
+  Avg latency: 18ms
+
+[Concurrent] 10 workers x 50 traces = 500 traces...
+  Throughput: 280 traces/sec
+  Avg latency: 22ms
+
+[Batch] 10 batches x 50 traces = 500 traces...
+  Throughput: 520 traces/sec
+  Avg batch latency: 95ms
+```
 
 ### Production Database
 
 For production, use PostgreSQL instead of SQLite:
 
 ```bash
-# Set environment variable
 export DATABASE_URL="postgresql+asyncpg://user:password@host:5432/agenttrace"
-```
-
-Or use Docker Compose:
-
-```bash
-docker-compose up -d
+export DATABASE_TYPE=postgres
 ```
 
 ### Environment Variables
 
-Configure the server with environment variables:
-
-- `DATABASE_URL`: SQLAlchemy connection string
-- `DATABASE_TYPE`: Database backend (sqlite or postgres)
-- `SERVER_HOST`: Host address (default: 0.0.0.0)
-- `SERVER_PORT`: Port number (default: 8000)
-- `MAX_TRACE_RETENTION_DAYS`: Maximum days to retain traces
-- `BUFFER_SIZE`: Buffer size for trace ingestion
-- `CORS_ORIGINS`: Comma-separated list of allowed CORS origins
-- `SECRET_KEY`: Secret key for JWT authentication
-- `ENVIRONMENT`: Environment type (development or production)
-
-### Authentication
-
-The server includes JWT-based authentication. To enable:
-
-1. Set `SECRET_KEY` to a strong random value
-2. Use the `/api/auth/register` endpoint to create users
-3. Use the `/api/auth/token` endpoint to get access tokens
-4. Include the token in the `Authorization` header: `Bearer <token>`
-
-### CORS Configuration
-
-In production, restrict CORS origins to specific domains:
-
-```bash
-export CORS_ORIGINS="https://yourdomain.com,https://app.yourdomain.com"
-```
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATABASE_URL` | SQLite | SQLAlchemy connection string |
+| `DATABASE_TYPE` | `sqlite` | `sqlite` or `postgres` |
+| `SERVER_HOST` | `0.0.0.0` | API bind address |
+| `SERVER_PORT` | `8000` | API port |
+| `CORS_ORIGINS` | `http://localhost:3000` | Allowed origins |
+| `AGENTTRACE_LLM_MODE` | `sim` | `sim` (mock) or `real` |
+| `OPENAI_API_KEY` | — | Required for real mode |
+| `ANTHROPIC_API_KEY` | — | Required for real mode |
 
 ## CI/CD Pipeline
 
@@ -316,13 +397,18 @@ This project demonstrates:
 - **Async/await patterns**: Python async for server, React hooks for dashboard
 - **Type safety**: Python type hints, TypeScript, Pydantic validation
 - **Modern web stack**: FastAPI, Next.js 14, Tailwind CSS, Recharts
-- **Database design**: SQLAlchemy ORM, migrations, indexing
-- **Testing**: pytest, pytest-asyncio, Playwright E2E
-- **Docker**: Multi-container deployment with PostgreSQL
-- **Observability**: Span-based tracing, cost tracking, token usage
+- **Database design**: SQLAlchemy ORM, migrations, indexing, cost attribution columns
+- **Testing**: pytest, pytest-asyncio, 85% coverage gate
+- **Docker**: Multi-container deployment with healthchecks, auto-migrate, auto-seed
+- **Observability**: Span-based tracing, cost tracking, token usage, waterfall timeline
+- **FinOps**: Cost analytics API, budget tracking, burn-rate projection, per-model breakdown
 - **Multi-agent correlation**: Correlation IDs for distributed workflows
 - **Trace diffing**: Compare runs for regression testing
 - **Prompt replay**: Step-by-step replay for debugging
+- **Provider wrappers**: `trace_openai()`, `trace_anthropic()` with automatic token/cost extraction
+- **Hybrid client**: Deterministic mock mode (`sim`) or live API mode (`real`) via env var
+- **Batch ingestion**: `/api/traces/batch` for high-throughput export
+- **Live tail**: SSE streaming of incoming spans in real time
 - **Authentication**: JWT-based API authentication
 - **Developer experience**: Decorators, context managers, API docs
-- **CI/CD**: GitHub Actions with automated testing and deployment.
+- **CI/CD**: GitHub Actions with automated testing and deployment

@@ -14,6 +14,8 @@ interface NavItem {
 const navItems: NavItem[] = [
   { label: "Dashboard", href: "/" },
   { label: "Runs", href: "/runs" },
+  { label: "Costs", href: "/costs" },
+  { label: "Live", href: "/live" },
 ];
 
 function ThemeToggle(): JSX.Element {

@@ -3,14 +3,14 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import BaseModel, Field
 from sqlalchemy import JSON, DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db.session import Base
+from app.db import Base
 
 
 class SpanEntry(Base):
@@ -47,7 +47,7 @@ class SpanEntry(Base):
     span_type: Mapped[str] = mapped_column(String(50), nullable=False)
     input_data: Mapped[Optional[dict]] = mapped_column("span_input_data", JSON, nullable=True)
     output_data: Mapped[Optional[dict]] = mapped_column("span_output_data", JSON, nullable=True)
-    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=datetime.utcnow)
+    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     duration_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     status: Mapped[str] = mapped_column(String(20), nullable=False, default="started")

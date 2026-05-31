@@ -4,13 +4,14 @@ from __future__ import annotations
 
 import functools
 import re
-from typing import Any, Callable, Optional, TypeVar
+from typing import Any, Callable, Optional, ParamSpec, TypeVar
 
 from agenttrace.span import SpanType
 from agenttrace.tracer import Tracer
 from agenttrace.cost_tracker import CostTracker
 
-F = TypeVar("F", bound=Callable[..., Any])
+P = ParamSpec("P")
+R = TypeVar("R")
 
 
 def _extract_token_usage(result: Any) -> Optional[dict[str, int]]:
@@ -113,7 +114,9 @@ def trace_llm(
     provider: str = "openai",
     cost_per_prompt_token: float | None = None,
     cost_per_completion_token: float | None = None,
-) -> Callable[[F], F]:
+    feature: str | None = None,
+    workflow_id: str | None = None,
+) -> Callable[[Callable[P, R]], Callable[P, R]]:
     """Decorator that automatically traces LLM API calls.
 
     Creates a span for each call, recording the prompt, completion,
@@ -122,23 +125,26 @@ def trace_llm(
     Args:
         tracer: The Tracer instance to use for recording.
         model: Name of the LLM model being called.
+        provider: LLM provider name.
         cost_per_prompt_token: Cost in USD per prompt token.
         cost_per_completion_token: Cost in USD per completion token.
+        feature: Optional feature/component name for cost attribution.
+        workflow_id: Optional workflow identifier for cost aggregation.
 
     Returns:
         A decorator function that wraps the target function.
 
     Example:
-        >>> @trace_llm(tracer, model="gpt-4")
+        >>> @trace_llm(tracer, model="gpt-4", feature="summarization")
         ... def call_gpt(prompt: str) -> str:
         ...     return "response"
     """
 
     cost_tracker = CostTracker()
 
-    def decorator(func: F) -> F:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:
         @functools.wraps(func)
-        def wrapper(*args: Any, **kwargs: Any) -> Any:
+        def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Resolve pricing if not explicitly set
             prompt_rate = cost_per_prompt_token
             completion_rate = cost_per_completion_token
@@ -151,16 +157,22 @@ def trace_llm(
                     prompt_rate = prompt_rate or 0.0
                     completion_rate = completion_rate or 0.0
 
+            metadata = {
+                "model": model,
+                "provider": provider,
+                "function": func.__name__,
+                "cost_per_prompt_token": prompt_rate,
+                "cost_per_completion_token": completion_rate,
+            }
+            if feature:
+                metadata["feature"] = feature
+            if workflow_id:
+                metadata["workflow_id"] = workflow_id
+
             span = tracer.start_span(
                 name=f"{model}:{func.__name__}",
                 span_type=SpanType.LLM_CALL,
-                metadata={
-                    "model": model,
-                    "provider": provider,
-                    "function": func.__name__,
-                    "cost_per_prompt_token": prompt_rate,
-                    "cost_per_completion_token": completion_rate,
-                },
+                metadata=metadata,
             )
 
             input_data = {"args": repr(args), "kwargs": repr(kwargs)}
@@ -187,6 +199,8 @@ def trace_llm(
                         prompt_tokens=usage["prompt_tokens"],
                         completion_tokens=usage["completion_tokens"],
                         latency_ms=span.duration_ms or 0,
+                        workflow_id=workflow_id,
+                        feature=feature,
                     )
                 elif isinstance(result, str):
                     estimated_tokens = max(1, len(result) // 4)
@@ -207,6 +221,6 @@ def trace_llm(
                 if span.end_time is None:
                     tracer.end_span(span)
 
-        return wrapper  # type: ignore[return-value]
+        return wrapper
 
     return decorator

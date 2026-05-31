@@ -2,17 +2,17 @@
 
 from __future__ import annotations
 
-import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select, update
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models.run import Run
 from app.models.trace import Trace, TraceCreate, TraceResponse
 from app.api.auth import get_optional_user, User
+from app.api.realtime import broadcast_trace
+from app.services.trace_service import TraceService
 
 router = APIRouter()
 
@@ -34,45 +34,60 @@ async def ingest_trace(
     Returns:
         The created trace record.
     """
-    trace = Trace(
-        id=str(uuid.uuid4()),
-        run_id=trace_data.run_id,
-        span_id=trace_data.span_id,
-        span_type=trace_data.span_type,
-        name=trace_data.name,
-        input_data=trace_data.input_data,
-        output_data=trace_data.output_data,
-        trace_metadata=trace_data.metadata,
-        start_time=trace_data.start_time,
-        end_time=trace_data.end_time,
-        duration_ms=trace_data.duration_ms,
-        cost_usd=trace_data.cost_usd,
-        token_usage=trace_data.token_usage,
-        status=trace_data.status,
-        error=trace_data.error,
-    )
-    session.add(trace)
+    service = TraceService(session)
+    trace = await service.ingest_trace(trace_data)
 
-    await session.flush()
+    # Broadcast to WebSocket clients
+    await broadcast_trace({
+        "id": trace.id,
+        "run_id": trace.run_id,
+        "span_id": trace.span_id,
+        "span_type": trace.span_type,
+        "name": trace.name,
+        "status": trace.status,
+        "duration_ms": trace.duration_ms,
+        "cost_usd": trace.cost_usd,
+        "timestamp": trace.start_time.isoformat() if trace.start_time else None,
+    })
 
-    traces_result = await session.execute(
-        select(Trace.cost_usd, Trace.token_usage).where(Trace.run_id == trace_data.run_id)
-    )
-    traces = traces_result.all()
-    total_cost = sum(cost or 0.0 for cost, _ in traces)
-    total_tokens = sum((usage or {}).get("total_tokens", 0) for _, usage in traces)
-
-    stmt = (
-        update(Run)
-        .where(Run.id == trace_data.run_id)
-        .values(
-            total_cost=total_cost,
-            total_tokens=total_tokens,
-            span_count=len(traces),
-        )
-    )
-    await session.execute(stmt)
     return trace
+
+
+@router.post("/traces/batch", response_model=list[TraceResponse], status_code=201)
+async def ingest_traces_batch(
+    trace_data_list: list[TraceCreate],
+    session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> list[Trace]:
+    """Ingest multiple trace spans in a single request.
+
+    Updates parent run aggregate stats after all traces are inserted.
+
+    Args:
+        trace_data_list: List of trace data to store.
+        session: Async database session.
+
+    Returns:
+        The created trace records.
+    """
+    service = TraceService(session)
+    traces = await service.ingest_traces_batch(trace_data_list)
+
+    # Broadcast each trace
+    for trace in traces:
+        await broadcast_trace({
+            "id": trace.id,
+            "run_id": trace.run_id,
+            "span_id": trace.span_id,
+            "span_type": trace.span_type,
+            "name": trace.name,
+            "status": trace.status,
+            "duration_ms": trace.duration_ms,
+            "cost_usd": trace.cost_usd,
+            "timestamp": trace.start_time.isoformat() if trace.start_time else None,
+        })
+
+    return traces
 
 
 @router.get("/traces", response_model=list[TraceResponse])
