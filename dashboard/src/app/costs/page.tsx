@@ -56,7 +56,7 @@ export default function CostsPage(): JSX.Element {
   const [byModel, setByModel] = useState<ModelCostBreakdown[]>([]);
   const [byProvider, setByProvider] = useState<{ provider: string; total_cost: number; span_count: number }[]>([]);
   const [byFeature, setByFeature] = useState<{ feature: string; total_cost: number; span_count: number }[]>([]);
-  const [topRuns, setTopRuns] = useState<{ id: string; name: string; total_cost: number; span_count: number; status: string }[]>([]);
+  const [topRuns, setTopRuns] = useState<{ id: string; name: string; total_cost: number; span_count: number; status: string; total_tokens?: number }[]>([]);
   const [projection, setProjection] = useState<{ daily_burn: number; monthly_projection: number } | null>(null);
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [budgetStatuses, setBudgetStatuses] = useState<Record<string, BudgetStatus>>({});
