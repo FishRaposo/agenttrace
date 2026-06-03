@@ -7,7 +7,6 @@ from datetime import datetime, timezone
 import pytest
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.trace import TraceCreate
 from app.models.run import Run
 from app.services.trace_service import TraceService
 

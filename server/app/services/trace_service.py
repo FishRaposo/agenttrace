@@ -8,7 +8,7 @@ from typing import Any
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.models.run import Run, RunCreate, RunListResponse, RunResponse
+from app.models.run import Run, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
 
 

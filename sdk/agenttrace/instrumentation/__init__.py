@@ -48,7 +48,7 @@ def auto_instrument(
             instrumentor = instrumentors[name]()
             instrumentor.instrument()
             results[name] = True
-        except Exception as e:
+        except Exception:
             results[name] = False
     
     return results

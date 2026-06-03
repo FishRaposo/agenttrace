@@ -11,7 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.db import get_session
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceResponse
-from app.api.auth import get_current_user, get_optional_user, User
+from app.api.auth import get_optional_user, User
 
 router = APIRouter()
 

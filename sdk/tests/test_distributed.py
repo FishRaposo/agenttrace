@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from agenttrace.distributed import TraceContext, ContextPropagator, DistributedTracer
 from agenttrace.tracer import Tracer

@@ -7,7 +7,6 @@ from typing import Any
 
 import pytest
 
-from agenttrace.span import SpanType
 from agenttrace.tracer import Tracer
 from agenttrace.wrappers.llm_wrapper import _extract_token_usage, _parse_token_string, trace_llm
 

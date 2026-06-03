@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import functools
 import os
-from typing import Any, Callable, ParamSpec, TypeVar
+from typing import Callable, ParamSpec, TypeVar
 
 from agenttrace.cost_tracker import CostTracker
 from agenttrace.span import SpanType

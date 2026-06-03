@@ -49,7 +49,7 @@ class OpenAIInstrumentor(Instrumentor):
             messages = kwargs.get("messages", [])
             prompt_tokens = sum(len(str(m.get("content", ""))) for m in messages) // 4
 
-            span = tracer.start_span(name=f"openai.chat.completions.create", span_type="llm_call")
+            span = tracer.start_span(name="openai.chat.completions.create", span_type="llm_call")
             span.input_data = {"model": model, "messages": messages}
 
             try:
@@ -80,7 +80,7 @@ class OpenAIInstrumentor(Instrumentor):
             messages = kwargs.get("messages", [])
             prompt_tokens = sum(len(str(m.get("content", ""))) for m in messages) // 4
 
-            span = tracer.start_span(name=f"openai.chat.completions.create", span_type="llm_call")
+            span = tracer.start_span(name="openai.chat.completions.create", span_type="llm_call")
             span.input_data = {"model": model, "messages": messages}
 
             try:

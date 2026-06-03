@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import pytest
 
 from agenttrace import Tracer
 from agenttrace.instrumentation.langchain import AgentTraceCallbackHandler

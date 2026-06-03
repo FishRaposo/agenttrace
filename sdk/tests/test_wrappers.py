@@ -6,7 +6,6 @@ from typing import Any
 
 import pytest
 
-from agenttrace.span import SpanType, SpanStatus
 from agenttrace.tracer import Tracer
 from agenttrace.wrappers.decision_wrapper import trace_decision
 from agenttrace.wrappers.retrieval_wrapper import trace_retrieval

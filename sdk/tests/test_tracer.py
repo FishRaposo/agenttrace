@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import pytest
 
-from agenttrace.span import Span, SpanType, SpanStatus
+from agenttrace.span import SpanType, SpanStatus
 from agenttrace.tracer import Tracer, RunStatus
 
 
