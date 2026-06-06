@@ -100,6 +100,9 @@ export default function CostsPage(): JSX.Element {
       }
     }
     load();
+
+    const interval = setInterval(load, 10000);
+    return () => clearInterval(interval);
   }, []);
 
   if (loading) {

@@ -45,12 +45,16 @@ class CostTracker:
             "gpt-4o": {"prompt": 0.005, "completion": 0.015},
             "gpt-4o-mini": {"prompt": 0.00015, "completion": 0.0006},
             "gpt-3.5-turbo": {"prompt": 0.0015, "completion": 0.002},
+            "o1": {"prompt": 0.015, "completion": 0.06},
+            "o1-mini": {"prompt": 0.003, "completion": 0.012},
+            "o3-mini": {"prompt": 0.0011, "completion": 0.0044},
         },
         "anthropic": {
             "claude-3-opus": {"prompt": 0.015, "completion": 0.075},
             "claude-3-sonnet": {"prompt": 0.003, "completion": 0.015},
             "claude-3-5-sonnet": {"prompt": 0.003, "completion": 0.015},
             "claude-3-haiku": {"prompt": 0.00025, "completion": 0.00125},
+            "claude-3-5-haiku": {"prompt": 0.001, "completion": 0.005},
         },
     }
     
@@ -74,10 +78,21 @@ class CostTracker:
             if path.exists():
                 try:
                     with open(path, "r") as f:
-                        data = json.load(f)
+                        if path.suffix in (".yaml", ".yml"):
+                            try:
+                                import yaml
+                                data = yaml.safe_load(f)
+                            except ImportError:
+                                continue
+                        else:
+                            data = json.load(f)
                     if isinstance(data, dict):
-                        self._pricing.update(data)
-                except (json.JSONDecodeError, OSError):
+                        for k, v in data.items():
+                            if k in self._pricing and isinstance(self._pricing[k], dict) and isinstance(v, dict):
+                                self._pricing[k].update(v)
+                            else:
+                                self._pricing[k] = v
+                except Exception:
                     pass
                 break
     
@@ -88,13 +103,13 @@ class CostTracker:
     
     def get_pricing(self, provider: str, model: str) -> dict[str, float] | None:
         """Get pricing for a provider/model.
-
+ 
         Returns:
             Dict with 'prompt' and 'completion' per-1k-token rates, or None.
         """
         provider_pricing = self._pricing.get(provider, {})
         return provider_pricing.get(model)
-
+ 
     def calculate_cost(
         self,
         provider: str,
@@ -103,7 +118,7 @@ class CostTracker:
         completion_tokens: int,
     ) -> float:
         """Calculate cost for a request."""
-        provider_pricing = self.PRICING.get(provider, {})
+        provider_pricing = self._pricing.get(provider, {})
         model_pricing = provider_pricing.get(model, {"prompt": 0.0, "completion": 0.0})
         
         prompt_cost = (prompt_tokens / 1000) * model_pricing["prompt"]

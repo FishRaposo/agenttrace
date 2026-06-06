@@ -244,3 +244,44 @@ class TraceService:
             "completion_tokens": completion_tokens,
             "total_tokens": prompt_tokens + completion_tokens,
         }
+
+    async def list_traces(
+        self,
+        run_id: Optional[str] = None,
+        span_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0,
+    ) -> list[Trace]:
+        """List traces with optional filtering and pagination.
+
+        Args:
+            run_id: Optional run ID filter.
+            span_type: Optional span type filter.
+            limit: Maximum number of traces to return.
+            offset: Pagination offset.
+
+        Returns:
+            List of Trace records ordered by start_time.
+        """
+        stmt = select(Trace)
+        if run_id is not None:
+            stmt = stmt.where(Trace.run_id == run_id)
+        if span_type is not None:
+            stmt = stmt.where(Trace.span_type == span_type)
+        stmt = stmt.order_by(Trace.start_time.desc()).limit(limit).offset(offset)
+
+        result = await self._session.execute(stmt)
+        return list(result.scalars().all())
+
+    async def get_trace(self, trace_id: str) -> Optional[Trace]:
+        """Get a specific trace by its ID.
+
+        Args:
+            trace_id: The unique trace identifier.
+
+        Returns:
+            The Trace record or None if not found.
+        """
+        stmt = select(Trace).where(Trace.id == trace_id)
+        result = await self._session.execute(stmt)
+        return result.scalar_one_or_none()

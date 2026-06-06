@@ -63,6 +63,12 @@ export default function RunsPage(): JSX.Element {
 
   useEffect(() => {
     loadRuns(offset, statusFilter, searchQuery);
+
+    const interval = setInterval(() => {
+      loadRuns(offset, statusFilter, searchQuery);
+    }, 5000);
+
+    return () => clearInterval(interval);
   }, [offset, statusFilter, searchQuery, loadRuns]);
 
   const totalPages = Math.ceil(total / limit);

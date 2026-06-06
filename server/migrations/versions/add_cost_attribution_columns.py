@@ -11,7 +11,7 @@ import sqlalchemy as sa
 
 # revision identifiers, used by Alembic.
 revision = "add_cost_attribution_columns"
-down_revision = "add_correlation_id_to_runs"
+down_revision = "add_correlation_id"
 branch_labels = None
 depends_on = None
 

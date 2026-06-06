@@ -110,15 +110,8 @@ async def list_traces(
     Returns:
         List of matching trace records.
     """
-    stmt = select(Trace)
-    if run_id is not None:
-        stmt = stmt.where(Trace.run_id == run_id)
-    if span_type is not None:
-        stmt = stmt.where(Trace.span_type == span_type)
-    stmt = stmt.order_by(Trace.start_time.desc()).limit(limit).offset(offset)
-
-    result = await session.execute(stmt)
-    return list(result.scalars().all())
+    service = TraceService(session)
+    return await service.list_traces(run_id=run_id, span_type=span_type, limit=limit, offset=offset)
 
 
 @router.get("/traces/{trace_id}", response_model=TraceResponse)
@@ -138,9 +131,8 @@ async def get_trace(
     Raises:
         HTTPException: If the trace is not found.
     """
-    stmt = select(Trace).where(Trace.id == trace_id)
-    result = await session.execute(stmt)
-    trace = result.scalar_one_or_none()
+    service = TraceService(session)
+    trace = await service.get_trace(trace_id)
 
     if trace is None:
         raise HTTPException(status_code=404, detail="Trace not found")

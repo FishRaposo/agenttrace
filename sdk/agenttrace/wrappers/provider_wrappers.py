@@ -111,7 +111,8 @@ def trace_openai(
                 raise
             finally:
                 if span.end_time is None:
-                    tracer.end_span(span)
+                    span.end()
+                tracer.end_span(span)
 
         return wrapper
 
@@ -207,7 +208,8 @@ def trace_anthropic(
                 raise
             finally:
                 if span.end_time is None:
-                    tracer.end_span(span)
+                    span.end()
+                tracer.end_span(span)
 
         return wrapper
 

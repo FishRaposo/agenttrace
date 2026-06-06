@@ -23,7 +23,6 @@ def upgrade() -> None:
     op.create_table(
         "runs",
         sa.Column("id", sa.String(36), primary_key=True),
-        sa.Column("correlation_id", sa.String(36), nullable=True),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("status", sa.String(20), nullable=False, server_default="running"),
         sa.Column("start_time", sa.DateTime(), nullable=False),
@@ -33,13 +32,12 @@ def upgrade() -> None:
         sa.Column("span_count", sa.Integer(), nullable=False, server_default="0"),
         sa.Column("run_metadata", sa.JSON(), nullable=True),
     )
-    op.create_index("ix_runs_correlation_id", "runs", ["correlation_id"])
 
     op.create_table(
         "traces",
         sa.Column("id", sa.String(36), primary_key=True),
         sa.Column("run_id", sa.String(36), nullable=False),
-        sa.Column("span_id", sa.String(36), nullable=False),
+        sa.Column("span_id", sa.String(36), nullable=False, unique=True),
         sa.Column("span_type", sa.String(50), nullable=False),
         sa.Column("name", sa.String(255), nullable=False),
         sa.Column("trace_input", sa.JSON(), nullable=True),
@@ -54,7 +52,6 @@ def upgrade() -> None:
         sa.Column("error", sa.Text(), nullable=True),
     )
     op.create_index("ix_traces_run_id", "traces", ["run_id"])
-    op.create_unique_constraint("uq_traces_span_id", "traces", ["span_id"])
     op.create_index("ix_traces_start_time", "traces", ["start_time"])
 
     op.create_table(

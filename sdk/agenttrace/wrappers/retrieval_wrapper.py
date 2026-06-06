@@ -55,7 +55,8 @@ def trace_retrieval(
                 raise
             finally:
                 if span.end_time is None:
-                    tracer.end_span(span)
+                    span.end()
+                tracer.end_span(span)
 
         return wrapper
 

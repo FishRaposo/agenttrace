@@ -81,6 +81,8 @@ class Tracer:
         exporter: The configured exporter for trace data.
     """
 
+    _instance: Optional[Tracer] = None
+
     def __init__(self, sample_rate: float = 1.0) -> None:
         self._exporter: Optional[BaseExporter] = None
         self._current_run: Optional[_RunState] = None

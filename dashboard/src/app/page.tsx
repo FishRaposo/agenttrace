@@ -86,6 +86,9 @@ export default function HomePage(): JSX.Element {
       }
     }
     loadData();
+
+    const interval = setInterval(loadData, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   if (error) {
