@@ -36,7 +36,8 @@ def trace_openai(
 
     Args:
         tracer: The Tracer instance.
-        model: Default model name (e.g. "gpt-4"). Auto-detected from response if available.
+        model: Default model name (e.g. "gpt-4"). Auto-detected from response
+            if available.
         feature: Optional feature/component for cost attribution.
         workflow_id: Optional workflow ID for cost aggregation.
 
@@ -59,11 +60,17 @@ def trace_openai(
                     "workflow_id": workflow_id,
                 },
             )
-            span.input_data = {"kwargs": {k: v for k, v in kwargs.items() if k != "api_key"}}
+            span.input_data = {
+                "kwargs": {k: v for k, v in kwargs.items() if k != "api_key"}
+            }
 
             try:
                 result = func(*args, **kwargs)
-                span.output_data = {"choices_count": len(result.choices) if hasattr(result, "choices") else 0}
+                span.output_data = {
+                    "choices_count": len(result.choices)
+                    if hasattr(result, "choices")
+                    else 0
+                }
                 span.end()
 
                 # Extract model from response
@@ -75,7 +82,9 @@ def trace_openai(
                 if usage is not None:
                     prompt_tokens = getattr(usage, "prompt_tokens", 0)
                     completion_tokens = getattr(usage, "completion_tokens", 0)
-                    total_tokens = getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
+                    total_tokens = getattr(
+                        usage, "total_tokens", prompt_tokens + completion_tokens
+                    )
                     span.token_usage = {
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
@@ -83,10 +92,9 @@ def trace_openai(
                     }
 
                     if pricing:
-                        span.cost_usd = (
-                            prompt_tokens * (pricing["prompt"] / 1000)
-                            + completion_tokens * (pricing["completion"] / 1000)
-                        )
+                        span.cost_usd = prompt_tokens * (
+                            pricing["prompt"] / 1000
+                        ) + completion_tokens * (pricing["completion"] / 1000)
                     else:
                         span.cost_usd = 0.0
 
@@ -156,11 +164,17 @@ def trace_anthropic(
                     "workflow_id": workflow_id,
                 },
             )
-            span.input_data = {"kwargs": {k: v for k, v in kwargs.items() if k != "api_key"}}
+            span.input_data = {
+                "kwargs": {k: v for k, v in kwargs.items() if k != "api_key"}
+            }
 
             try:
                 result = func(*args, **kwargs)
-                span.output_data = {"content_blocks": len(result.content) if hasattr(result, "content") else 0}
+                span.output_data = {
+                    "content_blocks": len(result.content)
+                    if hasattr(result, "content")
+                    else 0
+                }
                 span.end()
 
                 # Extract model from response
@@ -180,10 +194,9 @@ def trace_anthropic(
                     }
 
                     if pricing:
-                        span.cost_usd = (
-                            input_tokens * (pricing["prompt"] / 1000)
-                            + output_tokens * (pricing["completion"] / 1000)
-                        )
+                        span.cost_usd = input_tokens * (
+                            pricing["prompt"] / 1000
+                        ) + output_tokens * (pricing["completion"] / 1000)
                     else:
                         span.cost_usd = 0.0
 

@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-
-from agenttrace.distributed import TraceContext, ContextPropagator, DistributedTracer
+from agenttrace.distributed import ContextPropagator, DistributedTracer, TraceContext
 from agenttrace.tracer import Tracer
 
 
@@ -61,8 +60,35 @@ class TestDistributedTracer:
         with tracer.run("test"):
             span = dt.start_span_with_context(
                 "incoming",
-                {"traceparent": f"00-{'a'*32}-{'b'*16}-01"},
+                {"traceparent": f"00-{'a' * 32}-{'b' * 16}-01"},
             )
             assert span is not None
             assert span.metadata is not None
             assert span.metadata.get("correlation_id") == "a" * 32
+
+    def test_inject_extract_roundtrip(self) -> None:
+        """inject_context must emit a valid traceparent that extract parses.
+
+        run_id/span.id are dashed 36-char UUIDs; they must be normalized to
+        32-/16-hex or to_traceparent emits an invalid header and
+        from_traceparent returns None (cross-service correlation fails).
+        """
+        tracer = Tracer()
+        dt = DistributedTracer(tracer)
+
+        with tracer.run("test"):
+            span = tracer.start_span("work")
+            headers = dt.inject_context({})
+
+            traceparent = headers.get("traceparent")
+            assert traceparent is not None
+            # Header must match the W3C 32-hex/16-hex shape.
+            assert TraceContext.TRACEPARENT_REGEX.match(traceparent) is not None
+
+            extracted = dt.propagator.extract(headers)
+            assert extracted is not None
+            # The injected trace id derives from the active run_id.
+            import uuid
+
+            assert extracted.trace_id == uuid.UUID(span.run_id).hex
+            assert extracted.parent_id == uuid.UUID(span.id).hex[:16]

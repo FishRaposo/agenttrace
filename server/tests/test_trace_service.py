@@ -5,10 +5,9 @@ from __future__ import annotations
 from datetime import datetime, timezone
 
 import pytest
-from sqlalchemy.ext.asyncio import AsyncSession
-
 from app.models.run import Run
 from app.services.trace_service import TraceService
+from sqlalchemy.ext.asyncio import AsyncSession
 
 
 @pytest.fixture
@@ -98,7 +97,11 @@ async def test_calculate_run_tokens(
         span_type="llm_call",
         name="call1",
         start_time=datetime.now(timezone.utc),
-        token_usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+        token_usage={
+            "prompt_tokens": 100,
+            "completion_tokens": 50,
+            "total_tokens": 150,
+        },
         status="completed",
     )
     db_session.add(t1)
@@ -113,3 +116,70 @@ async def test_calculate_run_tokens(
 async def test_get_run_with_spans_not_found(trace_service: TraceService) -> None:
     result = await trace_service.get_run_with_spans("nonexistent")
     assert result is None
+
+
+async def test_ensure_run_exists_creates_placeholder(
+    trace_service: TraceService,
+) -> None:
+    run = await trace_service.ensure_run_exists("brand-new-trace")
+    assert run.id == "brand-new-trace"
+    assert run.status == "running"
+    # Idempotent: a second call returns the same row without duplicating it.
+    again = await trace_service.ensure_run_exists("brand-new-trace")
+    assert again.id == run.id
+
+
+async def test_ensure_run_exists_returns_existing(
+    trace_service: TraceService, db_session: AsyncSession
+) -> None:
+    existing = Run(
+        id="known-run",
+        name="known",
+        status="completed",
+        start_time=datetime.now(timezone.utc),
+    )
+    db_session.add(existing)
+    await db_session.flush()
+
+    fetched = await trace_service.ensure_run_exists("known-run")
+    assert fetched.name == "known"
+    assert fetched.status == "completed"
+
+
+async def test_ingest_spans_auto_creates_runs_and_accrues_stats(
+    trace_service: TraceService,
+) -> None:
+    from app.models.trace import TraceCreate
+
+    payloads = [
+        TraceCreate(
+            run_id="auto-run",
+            span_id="auto-span-1",
+            span_type="llm_call",
+            name="call-1",
+            start_time=datetime.now(timezone.utc),
+            cost_usd=0.01,
+            token_usage={
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            },
+            status="completed",
+        ),
+        TraceCreate(
+            run_id="auto-run",
+            span_id="auto-span-2",
+            span_type="tool_call",
+            name="call-2",
+            start_time=datetime.now(timezone.utc),
+            cost_usd=0.02,
+            status="completed",
+        ),
+    ]
+    traces = await trace_service.ingest_spans(payloads)
+    assert len(traces) == 2
+
+    run = await trace_service.ensure_run_exists("auto-run")
+    assert run.span_count == 2
+    assert run.total_cost == pytest.approx(0.03)
+    assert run.total_tokens == 15

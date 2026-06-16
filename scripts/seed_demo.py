@@ -21,11 +21,36 @@ from typing import Any
 
 
 MODELS = [
-    {"provider": "openai", "model": "gpt-4", "prompt_rate": 0.03, "completion_rate": 0.06},
-    {"provider": "openai", "model": "gpt-4-turbo", "prompt_rate": 0.01, "completion_rate": 0.03},
-    {"provider": "openai", "model": "gpt-3.5-turbo", "prompt_rate": 0.0015, "completion_rate": 0.002},
-    {"provider": "anthropic", "model": "claude-3-sonnet", "prompt_rate": 0.003, "completion_rate": 0.015},
-    {"provider": "anthropic", "model": "claude-3-haiku", "prompt_rate": 0.00025, "completion_rate": 0.00125},
+    {
+        "provider": "openai",
+        "model": "gpt-4",
+        "prompt_rate": 0.03,
+        "completion_rate": 0.06,
+    },
+    {
+        "provider": "openai",
+        "model": "gpt-4-turbo",
+        "prompt_rate": 0.01,
+        "completion_rate": 0.03,
+    },
+    {
+        "provider": "openai",
+        "model": "gpt-3.5-turbo",
+        "prompt_rate": 0.0015,
+        "completion_rate": 0.002,
+    },
+    {
+        "provider": "anthropic",
+        "model": "claude-3-sonnet",
+        "prompt_rate": 0.003,
+        "completion_rate": 0.015,
+    },
+    {
+        "provider": "anthropic",
+        "model": "claude-3-haiku",
+        "prompt_rate": 0.00025,
+        "completion_rate": 0.00125,
+    },
 ]
 
 SPAN_TEMPLATES = [
@@ -88,7 +113,13 @@ def _now(delta_seconds: float = 0.0) -> str:
     return (datetime.now(timezone.utc) - timedelta(seconds=delta_seconds)).isoformat()
 
 
-def create_run(endpoint: str, run_id: str, name: str, status: str, correlation_id: str | None = None) -> bool:
+def create_run(
+    endpoint: str,
+    run_id: str,
+    name: str,
+    status: str,
+    correlation_id: str | None = None,
+) -> bool:
     payload = {
         "id": run_id,
         "name": name,
@@ -202,7 +233,9 @@ def seed(endpoint: str, count: int = 12) -> None:
         num_spans = random.randint(3, 8)
         for s in range(num_spans):
             template = random.choice(SPAN_TEMPLATES)
-            span_name, span_type, dur_min, dur_max, tok_min, tok_max, fail_rate = template
+            span_name, span_type, dur_min, dur_max, tok_min, tok_max, fail_rate = (
+                template
+            )
 
             span_status = "completed"
             span_error = None
@@ -257,18 +290,29 @@ def seed(endpoint: str, count: int = 12) -> None:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description="Seed AgentTrace demo data")
-    parser.add_argument("--endpoint", default="http://localhost:8000/api", help="AgentTrace API base URL")
-    parser.add_argument("--count", type=int, default=12, help="Number of runs to generate")
+    parser.add_argument(
+        "--endpoint",
+        default="http://localhost:8000/api",
+        help="AgentTrace API base URL",
+    )
+    parser.add_argument(
+        "--count", type=int, default=12, help="Number of runs to generate"
+    )
     args = parser.parse_args()
 
     # Health check
     try:
-        req = urllib.request.Request(f"{args.endpoint.replace('/api', '')}/health", method="GET")
+        req = urllib.request.Request(
+            f"{args.endpoint.replace('/api', '')}/health", method="GET"
+        )
         with urllib.request.urlopen(req, timeout=5) as resp:
             if resp.status == 200:
                 print("Server is healthy.")
     except Exception:
-        print("Warning: Could not reach health endpoint. Server may not be running.", file=sys.stderr)
+        print(
+            "Warning: Could not reach health endpoint. Server may not be running.",
+            file=sys.stderr,
+        )
         return 1
 
     seed(args.endpoint, count=args.count)

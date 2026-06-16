@@ -8,8 +8,8 @@ import time
 from typing import Any
 
 try:
-    import urllib.request
     import urllib.error
+    import urllib.request
 
     _HAS_URLLIB = True
 except ImportError:
@@ -67,9 +67,7 @@ class APIExporter(BaseExporter):
             payload["span_id"] = payload.pop("id")
         return payload
 
-    def _send_request(
-        self, url: str, data: dict[str, Any], attempt: int = 0
-    ) -> bool:
+    def _send_request(self, url: str, data: dict[str, Any], attempt: int = 0) -> bool:
         """Send an HTTP POST request with retry logic.
 
         Args:

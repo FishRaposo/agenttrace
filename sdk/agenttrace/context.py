@@ -26,9 +26,7 @@ class RunContext:
     """
 
     @staticmethod
-    def set_current_run(
-        run_id: str, metadata: Optional[dict] = None
-    ) -> None:
+    def set_current_run(run_id: str, metadata: Optional[dict] = None) -> None:
         """Set the current active run.
 
         Args:

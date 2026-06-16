@@ -1,0 +1,22 @@
+{
+  "include": [
+    "server/app",
+    "sdk/agenttrace"
+  ],
+  "exclude": [
+    "**/node_modules",
+    "**/__pycache__",
+    "**/.next",
+    "dashboard",
+    "server/migrations",
+    "server/alembic",
+    ".venv"
+  ],
+  "venvPath": ".",
+  "venv": ".venv",
+  "pythonVersion": "3.11",
+  "analysis": {
+    "typeCheckingMode": "basic",
+    "useLibraryCodeForTypes": true
+  }
+}

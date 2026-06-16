@@ -48,13 +48,16 @@ async def test_cost_projection(client: AsyncClient) -> None:
 @pytest.mark.asyncio
 async def test_budget_lifecycle(client: AsyncClient) -> None:
     # Create
-    create_resp = await client.post("/api/budgets", json={
-        "name": "Test Budget",
-        "scope": "global",
-        "limit_usd": 10.0,
-        "period": "monthly",
-        "alert_threshold_pct": 80,
-    })
+    create_resp = await client.post(
+        "/api/budgets",
+        json={
+            "name": "Test Budget",
+            "scope": "global",
+            "limit_usd": 10.0,
+            "period": "monthly",
+            "alert_threshold_pct": 80,
+        },
+    )
     assert create_resp.status_code == 201
     budget = create_resp.json()
     budget_id = budget["id"]

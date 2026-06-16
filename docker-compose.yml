@@ -5,16 +5,20 @@ services:
     build:
       context: ./server
       dockerfile: Dockerfile
+    container_name: agenttrace_server
     ports:
       - "8000:8000"
     environment:
       - DATABASE_URL=postgresql+asyncpg://agenttrace:agenttrace@db:5432/agenttrace
       - DATABASE_TYPE=postgres
+      - REDIS_URL=redis://redis:6379/0
       - SERVER_HOST=0.0.0.0
       - SERVER_PORT=8000
       - CORS_ORIGINS=http://localhost:3000,http://dashboard:3000
     depends_on:
       db:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - ./data:/app/data
@@ -30,6 +34,7 @@ services:
     build:
       context: ./dashboard
       dockerfile: Dockerfile
+    container_name: agenttrace_dashboard
     ports:
       - "3000:3000"
     environment:
@@ -39,7 +44,8 @@ services:
         condition: service_healthy
 
   db:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
+    container_name: agenttrace_postgres
     ports:
       - "5432:5432"
     environment:
@@ -54,5 +60,19 @@ services:
       timeout: 5s
       retries: 5
 
+  redis:
+    image: redis:7-alpine
+    container_name: agenttrace_redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
 volumes:
   pgdata:
+  redisdata:

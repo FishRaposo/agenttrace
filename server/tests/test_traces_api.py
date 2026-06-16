@@ -126,7 +126,11 @@ async def test_ingest_trace(client: AsyncClient) -> None:
             "status": "completed",
             "duration_ms": 1500.0,
             "cost_usd": 0.003,
-            "token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            "token_usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
         },
     )
     assert response.status_code == 201
@@ -195,7 +199,11 @@ async def test_ingest_traces_batch(client: AsyncClient) -> None:
                 "start_time": datetime.now(timezone.utc).isoformat(),
                 "status": "completed",
                 "cost_usd": 0.001,
-                "token_usage": {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15},
+                "token_usage": {
+                    "prompt_tokens": 10,
+                    "completion_tokens": 5,
+                    "total_tokens": 15,
+                },
             },
             {
                 "run_id": run_id,
@@ -205,7 +213,11 @@ async def test_ingest_traces_batch(client: AsyncClient) -> None:
                 "start_time": datetime.now(timezone.utc).isoformat(),
                 "status": "completed",
                 "cost_usd": 0.002,
-                "token_usage": {"prompt_tokens": 20, "completion_tokens": 10, "total_tokens": 30},
+                "token_usage": {
+                    "prompt_tokens": 20,
+                    "completion_tokens": 10,
+                    "total_tokens": 30,
+                },
             },
         ],
     )

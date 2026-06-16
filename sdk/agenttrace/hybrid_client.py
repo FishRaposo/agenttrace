@@ -17,7 +17,7 @@ from dataclasses import dataclass
 from typing import Any
 
 from agenttrace.tracer import Tracer
-from agenttrace.wrappers.provider_wrappers import trace_openai, trace_anthropic
+from agenttrace.wrappers.provider_wrappers import trace_anthropic, trace_openai
 
 
 @dataclass
@@ -39,7 +39,8 @@ class HybridLLMClient:
     Args:
         mode: ``"sim"`` for mock responses (default) or ``"real"`` for live API calls.
         tracer: Optional AgentTrace Tracer for automatic instrumentation.
-        seed: Deterministic seed for simulated responses. Defaults to ``AGENTTRACE_LLM_SEED`` or 42.
+        seed: Deterministic seed for simulated responses. Defaults to
+            ``AGENTTRACE_LLM_SEED`` or 42.
     """
 
     def __init__(
@@ -51,7 +52,9 @@ class HybridLLMClient:
     ) -> None:
         self.mode = (mode or os.getenv("AGENTTRACE_LLM_MODE", "sim")).lower()
         self.tracer = tracer
-        self.seed = seed if seed is not None else int(os.getenv("AGENTTRACE_LLM_SEED", "42"))
+        self.seed = (
+            seed if seed is not None else int(os.getenv("AGENTTRACE_LLM_SEED", "42"))
+        )
         random.seed(self.seed)
 
         env_priority = os.getenv("AGENTTRACE_PROVIDER_PRIORITY", "")
@@ -84,7 +87,9 @@ class HybridLLMClient:
                 raise RuntimeError(
                     "Anthropic client not installed. Run: pip install anthropic"
                 ) from exc
-            self._anthropic_client = anthropic.Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+            self._anthropic_client = anthropic.Anthropic(
+                api_key=os.getenv("ANTHROPIC_API_KEY")
+            )
         return self._anthropic_client
 
     def _simulate(self, prompt: str, model: str, provider: str) -> HybridResponse:
@@ -125,7 +130,8 @@ class HybridLLMClient:
         """Send a chat completion request with optional multi-provider fallback.
 
         Args:
-            provider: Single provider name, list to try in order, or None to use priority list.
+            provider: Single provider name, list to try in order, or None to
+                use priority list.
             model: Model identifier.
             messages: Conversation messages.
             temperature: Sampling temperature.
@@ -221,7 +227,11 @@ class HybridLLMClient:
         raw = wrapped()
         content = ""
         if hasattr(raw, "content") and raw.content:
-            content = raw.content[0].text if hasattr(raw.content[0], "text") else str(raw.content[0])
+            content = (
+                raw.content[0].text
+                if hasattr(raw.content[0], "text")
+                else str(raw.content[0])
+            )
         usage = raw.usage
         input_tokens = getattr(usage, "input_tokens", 0)
         output_tokens = getattr(usage, "output_tokens", 0)

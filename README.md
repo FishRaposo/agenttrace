@@ -306,6 +306,32 @@ The server includes:
 - Database transaction rollback on failure
 - Graceful degradation when optional features are missing
 
+The dashboard includes a **demo mode**: when the trace backend is unreachable,
+read requests fall back to bundled fixtures and a visible banner appears, so the
+UI stays fully explorable offline (set `NEXT_PUBLIC_DEMO_MODE=1` to force it).
+
+## Cross-Service Ingestion & Interop
+
+Beyond the native SDK exporter, the collector accepts telemetry from other
+services built on the `shared_core` standard, and interoperates with
+OpenTelemetry tooling (best-effort, JSON subset):
+
+| Endpoint | Purpose |
+|----------|---------|
+| `POST /api/traces` · `/api/traces/batch` | Native SDK span ingestion |
+| `POST /api/traces/spans` | Canonical `shared_core.tracing.Span` ingestion (e.g. `hermes-agent-framework`) |
+| `POST /api/traces/costs` | LCM-style `shared_core.tracing.CostRecord` ingestion |
+| `GET /api/alerts` | Cost-threshold alert (daily + per-run) |
+| `GET /api/alerts/latency` | Per-span latency-threshold alert |
+| `GET /api/otlp/v1/traces` | Export stored spans as OTLP/JSON `ResourceSpans` |
+| `POST /api/otlp/v1/traces` | Ingest an OTLP/JSON `ExportTraceServiceRequest` |
+
+Inbound cost is taken **verbatim** — adapters normalize the canonical shapes
+into AgentTrace's `TraceCreate` and never recompute pricing, so cost analytics
+stay byte-for-byte stable. Missing runs are auto-created so foreign spans never
+drop. See [docs/design-decisions.md](docs/design-decisions.md) and
+[docs/EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md).
+
 ## Testing Strategy
 
 - **SDK**: Unit tests for Tracer, Span, exporters, and wrappers

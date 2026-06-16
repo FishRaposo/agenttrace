@@ -9,8 +9,8 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
-from app.models.trace import Trace
 from app.models.run import Run
+from app.models.trace import Trace
 
 router = APIRouter()
 
@@ -88,12 +88,17 @@ async def get_cost_timeseries(
     since = datetime.now(timezone.utc) - timedelta(days=days)
 
     # Fetch traces since date and aggregate in Python for SQLite compatibility
-    stmt = select(Trace).where(Trace.start_time >= since).order_by(Trace.start_time.asc())
+    stmt = (
+        select(Trace).where(Trace.start_time >= since).order_by(Trace.start_time.asc())
+    )
     result = await session.execute(stmt)
     traces = list(result.scalars().all())
 
     from collections import defaultdict
-    buckets: dict[str, dict] = defaultdict(lambda: {"cost": 0.0, "tokens": 0, "spans": 0})
+
+    buckets: dict[str, dict] = defaultdict(
+        lambda: {"cost": 0.0, "tokens": 0, "spans": 0}
+    )
 
     for t in traces:
         if t.start_time is None:
@@ -107,7 +112,12 @@ async def get_cost_timeseries(
         buckets[key]["spans"] += 1
 
     data = [
-        {"bucket": k, "cost": round(v["cost"], 6), "tokens": v["tokens"], "spans": v["spans"]}
+        {
+            "bucket": k,
+            "cost": round(v["cost"], 6),
+            "tokens": v["tokens"],
+            "spans": v["spans"],
+        }
         for k, v in sorted(buckets.items())
     ]
 
@@ -119,15 +129,20 @@ async def get_cost_by_model(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Return cost breakdown per model."""
-    stmt = (
-        select(Trace)
-        .where(Trace.model.isnot(None))
-    )
+    stmt = select(Trace).where(Trace.model.isnot(None))
     result = await session.execute(stmt)
     traces = list(result.scalars().all())
 
     from collections import defaultdict
-    stats: dict[str, dict] = defaultdict(lambda: {"total_cost": 0.0, "total_tokens": 0, "span_count": 0, "latency_sum": 0.0})
+
+    stats: dict[str, dict] = defaultdict(
+        lambda: {
+            "total_cost": 0.0,
+            "total_tokens": 0,
+            "span_count": 0,
+            "latency_sum": 0.0,
+        }
+    )
 
     for t in traces:
         model = t.model or "unknown"
@@ -144,7 +159,9 @@ async def get_cost_by_model(
             "span_count": v["span_count"],
             "avg_latency_ms": round(v["latency_sum"] / max(v["span_count"], 1), 2),
         }
-        for k, v in sorted(stats.items(), key=lambda x: x[1]["total_cost"], reverse=True)
+        for k, v in sorted(
+            stats.items(), key=lambda x: x[1]["total_cost"], reverse=True
+        )
     ]
 
 
@@ -206,11 +223,7 @@ async def get_top_expensive_runs(
     session: AsyncSession = Depends(get_session),
 ) -> list[dict]:
     """Return most expensive runs by total cost."""
-    stmt = (
-        select(Run)
-        .order_by(Run.total_cost.desc())
-        .limit(limit)
-    )
+    stmt = select(Run).order_by(Run.total_cost.desc()).limit(limit)
     result = await session.execute(stmt)
     runs = list(result.scalars().all())
     return [
@@ -236,14 +249,16 @@ async def get_cost_projection(
     since_30d = datetime.now(timezone.utc) - timedelta(days=30)
 
     cost_7d_result = await session.execute(
-        select(func.coalesce(func.sum(Trace.cost_usd), 0.0))
-        .where(Trace.start_time >= since_7d)
+        select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(
+            Trace.start_time >= since_7d
+        )
     )
     cost_7d = float(cost_7d_result.scalar() or 0.0)
 
     cost_30d_result = await session.execute(
-        select(func.coalesce(func.sum(Trace.cost_usd), 0.0))
-        .where(Trace.start_time >= since_30d)
+        select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(
+            Trace.start_time >= since_30d
+        )
     )
     cost_30d = float(cost_30d_result.scalar() or 0.0)
 

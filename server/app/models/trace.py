@@ -45,10 +45,18 @@ class Trace(Base):
     span_id: Mapped[str] = mapped_column(String(36), unique=True, nullable=False)
     span_type: Mapped[str] = mapped_column(String(50), nullable=False)
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    input_data: Mapped[Optional[dict]] = mapped_column("trace_input", JSON, nullable=True)
-    output_data: Mapped[Optional[dict]] = mapped_column("trace_output", JSON, nullable=True)
-    trace_metadata: Mapped[Optional[dict]] = mapped_column("trace_metadata", JSON, nullable=True)
-    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
+    input_data: Mapped[Optional[dict]] = mapped_column(
+        "trace_input", JSON, nullable=True
+    )
+    output_data: Mapped[Optional[dict]] = mapped_column(
+        "trace_output", JSON, nullable=True
+    )
+    trace_metadata: Mapped[Optional[dict]] = mapped_column(
+        "trace_metadata", JSON, nullable=True
+    )
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
+    )
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     duration_ms: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
     cost_usd: Mapped[Optional[float]] = mapped_column(Float, nullable=True)
@@ -58,8 +66,12 @@ class Trace(Base):
     parent_span_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True)
     # Cost-attribution columns
     model: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    provider: Mapped[Optional[str]] = mapped_column(String(50), nullable=True, index=True)
-    feature: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    provider: Mapped[Optional[str]] = mapped_column(
+        String(50), nullable=True, index=True
+    )
+    feature: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, index=True
+    )
 
 
 class TraceCreate(BaseModel):

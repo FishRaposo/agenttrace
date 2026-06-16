@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Optional
 
 from pydantic import BaseModel, Field
-from sqlalchemy import Float, Integer, String, DateTime
+from sqlalchemy import DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -37,7 +37,9 @@ class Budget(Base):
     scope_value: Mapped[Optional[str]] = mapped_column(String(255), nullable=True)
     limit_usd: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     period: Mapped[str] = mapped_column(String(50), nullable=False, default="monthly")
-    alert_threshold_pct: Mapped[int] = mapped_column(Integer, nullable=False, default=80)
+    alert_threshold_pct: Mapped[int] = mapped_column(
+        Integer, nullable=False, default=80
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )

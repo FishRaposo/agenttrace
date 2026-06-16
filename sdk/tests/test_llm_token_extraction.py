@@ -6,9 +6,12 @@ from types import SimpleNamespace
 from typing import Any
 
 import pytest
-
 from agenttrace.tracer import Tracer
-from agenttrace.wrappers.llm_wrapper import _extract_token_usage, _parse_token_string, trace_llm
+from agenttrace.wrappers.llm_wrapper import (
+    _extract_token_usage,
+    _parse_token_string,
+    trace_llm,
+)
 
 
 class TestExtractTokenUsageDict:
@@ -83,7 +86,9 @@ class TestExtractTokenUsageObject:
 
     def test_object_with_usage_metadata(self) -> None:
         result = SimpleNamespace(
-            usage_metadata=SimpleNamespace(prompt_token_count=8, candidates_token_count=12)
+            usage_metadata=SimpleNamespace(
+                prompt_token_count=8, candidates_token_count=12
+            )
         )
         usage = _extract_token_usage(result)
         assert usage is not None
@@ -153,11 +158,20 @@ class TestTraceLLMIntegration:
     """Integration tests for trace_llm with different result formats."""
 
     def test_dict_result_with_usage(self, tracer: Tracer) -> None:
-        @trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
+        @trace_llm(
+            tracer,
+            model="gpt-4",
+            cost_per_prompt_token=0.00003,
+            cost_per_completion_token=0.00006,
+        )
         def call_llm(prompt: str) -> dict[str, Any]:
             return {
                 "choices": [{"text": "response"}],
-                "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+                "usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 50,
+                    "total_tokens": 150,
+                },
             }
 
         with tracer.run("test_run"):
@@ -166,11 +180,18 @@ class TestTraceLLMIntegration:
         assert result["choices"][0]["text"] == "response"
 
     def test_object_result_with_usage(self, tracer: Tracer) -> None:
-        @trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
+        @trace_llm(
+            tracer,
+            model="gpt-4",
+            cost_per_prompt_token=0.00003,
+            cost_per_completion_token=0.00006,
+        )
         def call_llm(prompt: str) -> Any:
             return SimpleNamespace(
                 choices=[SimpleNamespace(text="response")],
-                usage=SimpleNamespace(prompt_tokens=100, completion_tokens=50, total_tokens=150),
+                usage=SimpleNamespace(
+                    prompt_tokens=100, completion_tokens=50, total_tokens=150
+                ),
             )
 
         with tracer.run("test_run"):
@@ -198,11 +219,20 @@ class TestTraceLLMIntegration:
                 broken_llm("hello")
 
     def test_cost_calculation(self, tracer: Tracer) -> None:
-        @trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
+        @trace_llm(
+            tracer,
+            model="gpt-4",
+            cost_per_prompt_token=0.00003,
+            cost_per_completion_token=0.00006,
+        )
         def call_llm(prompt: str) -> dict[str, Any]:
             return {
                 "choices": [{"text": "response"}],
-                "usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+                "usage": {
+                    "prompt_tokens": 100,
+                    "completion_tokens": 50,
+                    "total_tokens": 150,
+                },
             }
 
         with tracer.run("test_run"):

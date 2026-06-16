@@ -5,7 +5,6 @@ from __future__ import annotations
 import os
 
 import pytest
-
 from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.tracer import Tracer
 

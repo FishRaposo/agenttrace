@@ -8,10 +8,10 @@ from __future__ import annotations
 
 from typing import Any
 
+from agenttrace.cost_tracker import CostTracker
 from agenttrace.instrumentation.base import Instrumentor
 from agenttrace.span import SpanType
-from agenttrace import Tracer
-from agenttrace.cost_tracker import CostTracker
+from agenttrace.tracer import Tracer
 
 
 class OpenAIInstrumentor(Instrumentor):
@@ -33,12 +33,14 @@ class OpenAIInstrumentor(Instrumentor):
         self._original_create: Any = None
         self._original_create_async: Any = None
 
-    def instrument(self, **kwargs: Any) -> None:
+    def instrument(self, **kwargs: Any) -> None:  # noqa: C901
         """Instrument OpenAI chat completions."""
         try:
             import openai
-        except ImportError:
-            raise ImportError("openai not installed. Install with: pip install openai")
+        except ImportError as err:
+            raise ImportError(
+                "openai not installed. Install with: pip install openai"
+            ) from err
 
         completions = openai.resources.chat.completions.Completions
         async_completions = openai.resources.chat.completions.AsyncCompletions
@@ -56,7 +58,9 @@ class OpenAIInstrumentor(Instrumentor):
             model = kwargs.get("model", "gpt-4o")
             messages = kwargs.get("messages", [])
 
-            span = tracer.start_span(name="openai.chat.completions.create", span_type=SpanType.LLM_CALL)
+            span = tracer.start_span(
+                name="openai.chat.completions.create", span_type=SpanType.LLM_CALL
+            )
             span.input_data = {"model": model, "messages": messages}
             if span.metadata is None:
                 span.metadata = {}
@@ -64,15 +68,23 @@ class OpenAIInstrumentor(Instrumentor):
 
             try:
                 response = await original_async(self_, *args, **kwargs)
-                choice = response.choices[0] if getattr(response, "choices", None) else None
-                content = choice.message.content if choice and getattr(choice, "message", None) else ""
+                choice = (
+                    response.choices[0] if getattr(response, "choices", None) else None
+                )
+                content = (
+                    choice.message.content
+                    if choice and getattr(choice, "message", None)
+                    else ""
+                )
                 span.output_data = {"content": content}
 
                 usage = getattr(response, "usage", None)
                 if usage:
                     prompt_tokens = getattr(usage, "prompt_tokens", 0)
                     completion_tokens = getattr(usage, "completion_tokens", 0)
-                    total_tokens = getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
+                    total_tokens = getattr(
+                        usage, "total_tokens", prompt_tokens + completion_tokens
+                    )
                     span.token_usage = {
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
@@ -80,10 +92,9 @@ class OpenAIInstrumentor(Instrumentor):
                     }
                     pricing = cost_tracker.get_pricing("openai", model)
                     if pricing:
-                        span.cost_usd = (
-                            prompt_tokens * (pricing["prompt"] / 1000)
-                            + completion_tokens * (pricing["completion"] / 1000)
-                        )
+                        span.cost_usd = prompt_tokens * (
+                            pricing["prompt"] / 1000
+                        ) + completion_tokens * (pricing["completion"] / 1000)
                     else:
                         span.cost_usd = 0.0
 
@@ -101,7 +112,9 @@ class OpenAIInstrumentor(Instrumentor):
             model = kwargs.get("model", "gpt-4o")
             messages = kwargs.get("messages", [])
 
-            span = tracer.start_span(name="openai.chat.completions.create", span_type=SpanType.LLM_CALL)
+            span = tracer.start_span(
+                name="openai.chat.completions.create", span_type=SpanType.LLM_CALL
+            )
             span.input_data = {"model": model, "messages": messages}
             if span.metadata is None:
                 span.metadata = {}
@@ -109,15 +122,23 @@ class OpenAIInstrumentor(Instrumentor):
 
             try:
                 response = original(self_, *args, **kwargs)
-                choice = response.choices[0] if getattr(response, "choices", None) else None
-                content = choice.message.content if choice and getattr(choice, "message", None) else ""
+                choice = (
+                    response.choices[0] if getattr(response, "choices", None) else None
+                )
+                content = (
+                    choice.message.content
+                    if choice and getattr(choice, "message", None)
+                    else ""
+                )
                 span.output_data = {"content": content}
 
                 usage = getattr(response, "usage", None)
                 if usage:
                     prompt_tokens = getattr(usage, "prompt_tokens", 0)
                     completion_tokens = getattr(usage, "completion_tokens", 0)
-                    total_tokens = getattr(usage, "total_tokens", prompt_tokens + completion_tokens)
+                    total_tokens = getattr(
+                        usage, "total_tokens", prompt_tokens + completion_tokens
+                    )
                     span.token_usage = {
                         "prompt_tokens": prompt_tokens,
                         "completion_tokens": completion_tokens,
@@ -125,10 +146,9 @@ class OpenAIInstrumentor(Instrumentor):
                     }
                     pricing = cost_tracker.get_pricing("openai", model)
                     if pricing:
-                        span.cost_usd = (
-                            prompt_tokens * (pricing["prompt"] / 1000)
-                            + completion_tokens * (pricing["completion"] / 1000)
-                        )
+                        span.cost_usd = prompt_tokens * (
+                            pricing["prompt"] / 1000
+                        ) + completion_tokens * (pricing["completion"] / 1000)
                     else:
                         span.cost_usd = 0.0
 
@@ -149,11 +169,16 @@ class OpenAIInstrumentor(Instrumentor):
         """Remove OpenAI instrumentation."""
         try:
             import openai
+
             if self._original_create is not None:
-                openai.resources.chat.completions.Completions.create = self._original_create
+                openai.resources.chat.completions.Completions.create = (
+                    self._original_create
+                )
                 self._original_create = None
             if self._original_create_async is not None:
-                openai.resources.chat.completions.AsyncCompletions.create = self._original_create_async
+                openai.resources.chat.completions.AsyncCompletions.create = (
+                    self._original_create_async
+                )
                 self._original_create_async = None
         except (ImportError, AttributeError):
             pass

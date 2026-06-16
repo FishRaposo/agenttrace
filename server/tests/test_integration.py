@@ -91,7 +91,11 @@ async def test_run_diff_flow(client: AsyncClient) -> None:
             "status": "completed",
             "duration_ms": 1000.0,
             "cost_usd": 0.01,
-            "token_usage": {"prompt_tokens": 60, "completion_tokens": 40, "total_tokens": 100},
+            "token_usage": {
+                "prompt_tokens": 60,
+                "completion_tokens": 40,
+                "total_tokens": 100,
+            },
         },
     )
 
@@ -106,7 +110,11 @@ async def test_run_diff_flow(client: AsyncClient) -> None:
             "status": "completed",
             "duration_ms": 2000.0,
             "cost_usd": 0.02,
-            "token_usage": {"prompt_tokens": 120, "completion_tokens": 80, "total_tokens": 200},
+            "token_usage": {
+                "prompt_tokens": 120,
+                "completion_tokens": 80,
+                "total_tokens": 200,
+            },
         },
     )
 
@@ -194,7 +202,9 @@ async def test_alerts_flow(client: AsyncClient) -> None:
     )
 
     # Check alerts
-    response = await client.get("/api/alerts?daily_threshold=10.0&per_run_threshold=5.0")
+    response = await client.get(
+        "/api/alerts?daily_threshold=10.0&per_run_threshold=5.0"
+    )
     assert response.status_code == 200
     alerts = response.json()
 
@@ -231,12 +241,10 @@ async def test_streaming_flow(client: AsyncClient) -> None:
 
     # In-process httpx ASGI transport buffers streaming responses until the
     # body completes, so verify registration without consuming the infinite SSE.
+    # Use the OpenAPI schema (version-robust: FastAPI's include_router no longer
+    # flattens sub-router routes into app.routes).
     from app.main import app
 
-    routes = [
-        route
-        for route in app.routes
-        if getattr(route, "path", None) == "/api/stream/traces"
-    ]
-    assert len(routes) == 1
-    assert "GET" in routes[0].methods
+    schema = app.openapi()
+    assert "/api/stream/traces" in schema["paths"]
+    assert "get" in schema["paths"]["/api/stream/traces"]

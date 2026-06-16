@@ -16,19 +16,74 @@ import type {
   Budget,
   BudgetStatus,
 } from "@/types";
+import { demoResponseFor } from "@/lib/demoData";
 
 const API_BASE_URL: string =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
+/**
+ * Whether demo mode is forced on via env. When unset, demo mode activates
+ * automatically the first time a network request to the backend fails.
+ */
+const DEMO_FORCED: boolean = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
+
+let demoMode = DEMO_FORCED;
+const demoListeners = new Set<(active: boolean) => void>();
+
+/** Returns true when the dashboard is serving demo fixtures. */
+export function isDemoMode(): boolean {
+  return demoMode;
+}
+
+/** Subscribe to demo-mode changes; returns an unsubscribe function. */
+export function subscribeDemoMode(listener: (active: boolean) => void): () => void {
+  demoListeners.add(listener);
+  listener(demoMode);
+  return () => demoListeners.delete(listener);
+}
+
+function setDemoMode(active: boolean): void {
+  if (demoMode === active) return;
+  demoMode = active;
+  demoListeners.forEach((l) => l(active));
+}
+
+/** Internal: read a demo fixture for a path, or throw if none exists. */
+function demoOrThrow<T>(path: string): T {
+  const data = demoResponseFor(path);
+  if (data === undefined) {
+    throw new Error(`No demo data available for ${path}`);
+  }
+  return data as T;
+}
+
 async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
+  // When demo mode is already active, short-circuit to fixtures (GET only).
+  if (demoMode && (!options?.method || options.method === "GET")) {
+    return demoOrThrow<T>(path);
+  }
+
   const url = `${API_BASE_URL}${path}`;
-  const response = await fetch(url, {
-    headers: {
-      "Content-Type": "application/json",
-      ...options?.headers,
-    },
-    ...options,
-  });
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      headers: {
+        "Content-Type": "application/json",
+        ...options?.headers,
+      },
+      ...options,
+    });
+  } catch (err) {
+    // Network failure (backend offline) — fall back to demo data for reads.
+    if (!options?.method || options.method === "GET") {
+      const data = demoResponseFor(path);
+      if (data !== undefined) {
+        setDemoMode(true);
+        return data as T;
+      }
+    }
+    throw err;
+  }
 
   if (!response.ok) {
     throw new Error(`API error: ${response.status} ${response.statusText}`);

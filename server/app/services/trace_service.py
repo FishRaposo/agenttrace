@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from typing import Any
+from typing import Any, Optional
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -66,7 +66,9 @@ class TraceService:
         )
         return trace
 
-    async def ingest_traces_batch(self, trace_data_list: list[TraceCreate]) -> list[Trace]:
+    async def ingest_traces_batch(
+        self, trace_data_list: list[TraceCreate]
+    ) -> list[Trace]:
         """Ingest multiple traces and update run stats incrementally.
 
         Args:
@@ -76,7 +78,7 @@ class TraceService:
             The persisted Trace records.
         """
         traces: list[Trace] = []
-        run_deltas: dict[str, tuple[float, int]] = {}
+        run_deltas: dict[str, tuple[float, int, int]] = {}
 
         for trace_data in trace_data_list:
             trace = Trace(
@@ -106,16 +108,78 @@ class TraceService:
             # Aggregate deltas per run
             cost = trace_data.cost_usd or 0.0
             tokens = (trace_data.token_usage or {}).get("total_tokens", 0)
-            prev_cost, prev_tokens, prev_count = run_deltas.get(trace_data.run_id, (0.0, 0, 0))
-            run_deltas[trace_data.run_id] = (prev_cost + cost, prev_tokens + tokens, prev_count + 1)
+            prev_cost, prev_tokens, prev_count = run_deltas.get(
+                trace_data.run_id, (0.0, 0, 0)
+            )
+            run_deltas[trace_data.run_id] = (
+                prev_cost + cost,
+                prev_tokens + tokens,
+                prev_count + 1,
+            )
 
         await self._session.flush()
 
         # Apply incremental updates per run
         for run_id, (cost_delta, token_delta, count_delta) in run_deltas.items():
-            await self._increment_run_stats(run_id, cost_delta, token_delta, count_delta)
+            await self._increment_run_stats(
+                run_id, cost_delta, token_delta, count_delta
+            )
 
         return traces
+
+    async def ensure_run_exists(self, run_id: str, name: str | None = None) -> Run:
+        """Return the run for ``run_id``, creating a placeholder if missing.
+
+        Used by the cross-service ingestion path: spans emitted by external
+        producers (e.g. ``hermes-agent-framework``) carry only a ``trace_id`` and
+        may arrive before any explicit run record exists. This lazily materializes
+        a ``running`` run so its aggregate stats can accumulate.
+
+        Args:
+            run_id: The run identifier (a shared_core ``trace_id``).
+            name: Optional human-readable name for a freshly created run.
+
+        Returns:
+            The existing or newly created ``Run``.
+        """
+        run = await self._session.get(Run, run_id)
+        if run is not None:
+            return run
+        run = Run(
+            id=run_id,
+            name=name or f"ingested-{run_id[:8]}",
+            status="running",
+        )
+        self._session.add(run)
+        await self._session.flush()
+        return run
+
+    async def ingest_spans(
+        self,
+        trace_data_list: list[TraceCreate],
+        auto_create_runs: bool = True,
+    ) -> list[Trace]:
+        """Ingest spans from an external producer, optionally creating runs.
+
+        This is the cross-service ingestion entry point used by the OTLP-style
+        and shared-span endpoints. It guarantees a run record exists for every
+        referenced ``run_id`` before delegating to the standard batch path, so
+        aggregate stats are populated even when the producer never created a run.
+
+        Args:
+            trace_data_list: Validated trace payloads to ingest.
+            auto_create_runs: When True, lazily create missing runs.
+
+        Returns:
+            The persisted ``Trace`` records.
+        """
+        if auto_create_runs:
+            seen: set[str] = set()
+            for td in trace_data_list:
+                if td.run_id not in seen:
+                    seen.add(td.run_id)
+                    await self.ensure_run_exists(td.run_id, name=td.name)
+        return await self.ingest_traces_batch(trace_data_list)
 
     async def _increment_run_stats(
         self, run_id: str, cost: float, tokens: int, count: int = 1
@@ -128,11 +192,7 @@ class TraceService:
             tokens: Tokens to add.
             count: Span count to add (default 1).
         """
-        stmt = (
-            select(Run)
-            .where(Run.id == run_id)
-            .with_for_update()
-        )
+        stmt = select(Run).where(Run.id == run_id).with_for_update()
         result = await self._session.execute(stmt)
         run = result.scalar_one_or_none()
         if run is not None:
@@ -150,9 +210,7 @@ class TraceService:
             List of Trace records ordered by start_time.
         """
         stmt = (
-            select(Trace)
-            .where(Trace.run_id == run_id)
-            .order_by(Trace.start_time.asc())
+            select(Trace).where(Trace.run_id == run_id).order_by(Trace.start_time.asc())
         )
         result = await self._session.execute(stmt)
         return list(result.scalars().all())
@@ -179,9 +237,7 @@ class TraceService:
             "spans": [TraceResponse.model_validate(s).model_dump() for s in spans],
         }
 
-    async def list_runs(
-        self, limit: int = 20, offset: int = 0
-    ) -> RunListResponse:
+    async def list_runs(self, limit: int = 20, offset: int = 0) -> RunListResponse:
         """List runs with pagination.
 
         Args:

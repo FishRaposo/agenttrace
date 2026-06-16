@@ -31,8 +31,9 @@ async def get_stats(
     total_tokens = int(total_tokens_result.scalar() or 0)
 
     avg_duration_result = await session.execute(
-        select(func.coalesce(func.avg(Trace.duration_ms), 0.0))
-        .where(Trace.duration_ms.isnot(None))
+        select(func.coalesce(func.avg(Trace.duration_ms), 0.0)).where(
+            Trace.duration_ms.isnot(None)
+        )
     )
     avg_duration_ms = float(avg_duration_result.scalar() or 0.0)
 

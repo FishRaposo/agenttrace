@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Moon, Sun } from "lucide-react";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
+import { DemoModeBanner } from "@/components/DemoModeBanner";
 import "./globals.css";
 
 interface NavItem {
@@ -95,8 +96,11 @@ export default function RootLayout({
               <ThemeToggle />
             </div>
           </aside>
-          <main className="flex-1 p-8">
-            <ErrorBoundary>{children}</ErrorBoundary>
+          <main className="flex-1">
+            <DemoModeBanner />
+            <div className="p-8">
+              <ErrorBoundary>{children}</ErrorBoundary>
+            </div>
           </main>
         </div>
       </body>

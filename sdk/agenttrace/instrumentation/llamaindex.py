@@ -9,7 +9,7 @@ from typing import Any, Optional
 
 from agenttrace.instrumentation.base import Instrumentor
 from agenttrace.span import Span, SpanType
-from agenttrace import Tracer
+from agenttrace.tracer import Tracer
 
 try:
     from llama_index.core.callbacks.base_handler import BaseCallbackHandler
@@ -47,7 +47,8 @@ class AgentTraceLlamaIndexHandler(BaseCallbackHandler):
             elif event_type == CBEventType.SYNTHESIZE:
                 span_type = SpanType.DECISION
 
-        name = f"llamaindex.{event_type.value if hasattr(event_type, 'value') else event_type}"
+        event_label = event_type.value if hasattr(event_type, "value") else event_type
+        name = f"llamaindex.{event_label}"
         span = self.tracer.start_span(
             name=name,
             span_type=span_type,
@@ -103,11 +104,17 @@ class LlamaIndexInstrumentor(Instrumentor):
         try:
             from llama_index.core import Settings
             from llama_index.core.callbacks import CallbackManager
-        except ImportError:
-            raise ImportError("llama-index-core not installed. Install with: pip install llama-index-core")
+        except ImportError as err:
+            raise ImportError(
+                "llama-index-core not installed. "
+                "Install with: pip install llama-index-core"
+            ) from err
 
         self._handler = AgentTraceLlamaIndexHandler(self.tracer)
-        if hasattr(Settings, "callback_manager") and Settings.callback_manager is not None:
+        if (
+            hasattr(Settings, "callback_manager")
+            and Settings.callback_manager is not None
+        ):
             Settings.callback_manager.add_handler(self._handler)
         else:
             Settings.callback_manager = CallbackManager([self._handler])
@@ -118,7 +125,11 @@ class LlamaIndexInstrumentor(Instrumentor):
         if self._handler is not None:
             try:
                 from llama_index.core import Settings
-                if hasattr(Settings, "callback_manager") and Settings.callback_manager is not None:
+
+                if (
+                    hasattr(Settings, "callback_manager")
+                    and Settings.callback_manager is not None
+                ):
                     handlers = Settings.callback_manager.handlers
                     if self._handler in handlers:
                         handlers.remove(self._handler)

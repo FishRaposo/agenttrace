@@ -87,7 +87,9 @@ async def get_budget_status(
         since = now - timedelta(days=30)
 
     # Build cost query based on scope
-    cost_stmt = select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(Trace.start_time >= since)
+    cost_stmt = select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(
+        Trace.start_time >= since
+    )
     if budget.scope == "provider" and budget.scope_value:
         cost_stmt = cost_stmt.where(Trace.provider == budget.scope_value)
     elif budget.scope == "model" and budget.scope_value:
@@ -98,13 +100,17 @@ async def get_budget_status(
     cost_result = await session.execute(cost_stmt)
     current_cost = float(cost_result.scalar() or 0.0)
 
-    percent_used = (current_cost / budget.limit_usd * 100) if budget.limit_usd > 0 else 0.0
+    percent_used = (
+        (current_cost / budget.limit_usd * 100) if budget.limit_usd > 0 else 0.0
+    )
     alert_triggered = percent_used >= budget.alert_threshold_pct
     breached = current_cost >= budget.limit_usd
 
     # Monthly projection (always compute trailing 7d burn)
     since_7d = now - timedelta(days=7)
-    projection_stmt = select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(Trace.start_time >= since_7d)
+    projection_stmt = select(func.coalesce(func.sum(Trace.cost_usd), 0.0)).where(
+        Trace.start_time >= since_7d
+    )
     if budget.scope == "provider" and budget.scope_value:
         projection_stmt = projection_stmt.where(Trace.provider == budget.scope_value)
     elif budget.scope == "model" and budget.scope_value:

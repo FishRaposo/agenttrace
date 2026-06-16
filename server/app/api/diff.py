@@ -48,8 +48,12 @@ async def diff_runs(
         raise HTTPException(status_code=404, detail="One or both runs not found")
 
     # Get spans for both runs
-    spans_stmt1 = select(Trace).where(Trace.run_id == run_id_1).order_by(Trace.start_time.asc())
-    spans_stmt2 = select(Trace).where(Trace.run_id == run_id_2).order_by(Trace.start_time.asc())
+    spans_stmt1 = (
+        select(Trace).where(Trace.run_id == run_id_1).order_by(Trace.start_time.asc())
+    )
+    spans_stmt2 = (
+        select(Trace).where(Trace.run_id == run_id_2).order_by(Trace.start_time.asc())
+    )
 
     spans_result1 = await session.execute(spans_stmt1)
     spans_result2 = await session.execute(spans_stmt2)
@@ -63,8 +67,12 @@ async def diff_runs(
     span_count_diff = run2.span_count - run1.span_count
 
     # Calculate duration difference
-    duration1 = (run1.end_time - run1.start_time).total_seconds() if run1.end_time else 0
-    duration2 = (run2.end_time - run2.start_time).total_seconds() if run2.end_time else 0
+    duration1 = (
+        (run1.end_time - run1.start_time).total_seconds() if run1.end_time else 0
+    )
+    duration2 = (
+        (run2.end_time - run2.start_time).total_seconds() if run2.end_time else 0
+    )
     duration_diff = duration2 - duration1
 
     # Compare spans by name and type
@@ -78,8 +86,12 @@ async def diff_runs(
     # Find span differences for common spans
     span_differences = []
     for name, span_type in common_spans:
-        span1 = next((s for s in spans1 if s.name == name and s.span_type == span_type), None)
-        span2 = next((s for s in spans2 if s.name == name and s.span_type == span_type), None)
+        span1 = next(
+            (s for s in spans1 if s.name == name and s.span_type == span_type), None
+        )
+        span2 = next(
+            (s for s in spans2 if s.name == name and s.span_type == span_type), None
+        )
 
         if span1 and span2:
             diff = {
@@ -91,7 +103,11 @@ async def diff_runs(
                 "status_1": span1.status,
                 "status_2": span2.status,
             }
-            if diff["duration_diff"] != 0 or diff["cost_diff"] != 0 or diff["status_changed"]:
+            if (
+                diff["duration_diff"] != 0
+                or diff["cost_diff"] != 0
+                or diff["status_changed"]
+            ):
                 span_differences.append(diff)
 
     return {

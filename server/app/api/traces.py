@@ -5,16 +5,38 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, get_optional_user
+from app.api.realtime import broadcast_trace
 from app.db import get_session
 from app.models.trace import Trace, TraceCreate, TraceResponse
-from app.api.auth import get_optional_user, User
-from app.api.realtime import broadcast_trace
+from app.services.ingest_adapters import (
+    CostRecordIngest,
+    SharedSpanIngest,
+    cost_record_to_trace_create,
+    span_to_trace_create,
+)
 from app.services.trace_service import TraceService
 
 router = APIRouter()
+
+
+async def _broadcast(trace: Trace) -> None:
+    """Broadcast a freshly ingested trace to live WebSocket subscribers."""
+    await broadcast_trace(
+        {
+            "id": trace.id,
+            "run_id": trace.run_id,
+            "span_id": trace.span_id,
+            "span_type": trace.span_type,
+            "name": trace.name,
+            "status": trace.status,
+            "duration_ms": trace.duration_ms,
+            "cost_usd": trace.cost_usd,
+            "timestamp": trace.start_time.isoformat() if trace.start_time else None,
+        }
+    )
 
 
 @router.post("/traces", response_model=TraceResponse, status_code=201)
@@ -36,20 +58,7 @@ async def ingest_trace(
     """
     service = TraceService(session)
     trace = await service.ingest_trace(trace_data)
-
-    # Broadcast to WebSocket clients
-    await broadcast_trace({
-        "id": trace.id,
-        "run_id": trace.run_id,
-        "span_id": trace.span_id,
-        "span_type": trace.span_type,
-        "name": trace.name,
-        "status": trace.status,
-        "duration_ms": trace.duration_ms,
-        "cost_usd": trace.cost_usd,
-        "timestamp": trace.start_time.isoformat() if trace.start_time else None,
-    })
-
+    await _broadcast(trace)
     return trace
 
 
@@ -72,21 +81,8 @@ async def ingest_traces_batch(
     """
     service = TraceService(session)
     traces = await service.ingest_traces_batch(trace_data_list)
-
-    # Broadcast each trace
     for trace in traces:
-        await broadcast_trace({
-            "id": trace.id,
-            "run_id": trace.run_id,
-            "span_id": trace.span_id,
-            "span_type": trace.span_type,
-            "name": trace.name,
-            "status": trace.status,
-            "duration_ms": trace.duration_ms,
-            "cost_usd": trace.cost_usd,
-            "timestamp": trace.start_time.isoformat() if trace.start_time else None,
-        })
-
+        await _broadcast(trace)
     return traces
 
 
@@ -111,7 +107,64 @@ async def list_traces(
         List of matching trace records.
     """
     service = TraceService(session)
-    return await service.list_traces(run_id=run_id, span_type=span_type, limit=limit, offset=offset)
+    return await service.list_traces(
+        run_id=run_id, span_type=span_type, limit=limit, offset=offset
+    )
+
+
+@router.post("/traces/spans", response_model=list[TraceResponse], status_code=201)
+async def ingest_shared_spans(
+    spans: list[SharedSpanIngest],
+    session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> list[Trace]:
+    """Ingest spans in the canonical ``shared_core.tracing.Span`` shape.
+
+    Accepts spans emitted by any ``shared_core``-based producer (e.g.
+    ``hermes-agent-framework``). Each span's ``trace_id`` maps to a run, which is
+    created on demand if it does not already exist. Cost is taken verbatim from
+    span attributes — no pricing is recomputed.
+
+    Args:
+        spans: List of canonical shared_core spans.
+        session: Async database session.
+
+    Returns:
+        The created trace records.
+    """
+    service = TraceService(session)
+    trace_creates = [span_to_trace_create(s) for s in spans]
+    traces = await service.ingest_spans(trace_creates)
+    for trace in traces:
+        await _broadcast(trace)
+    return traces
+
+
+@router.post("/traces/costs", response_model=list[TraceResponse], status_code=201)
+async def ingest_cost_records(
+    records: list[CostRecordIngest],
+    session: AsyncSession = Depends(get_session),
+    current_user: User | None = Depends(get_optional_user),
+) -> list[Trace]:
+    """Ingest LCM-style ``shared_core.tracing.CostRecord`` payloads.
+
+    Each cost record is materialized as a single ``llm_call`` span carrying its
+    verbatim ``estimated_cost`` and token usage, so it appears in the standard
+    cost-attribution analytics. Missing runs are created on demand.
+
+    Args:
+        records: List of cost records.
+        session: Async database session.
+
+    Returns:
+        The created trace records.
+    """
+    service = TraceService(session)
+    trace_creates = [cost_record_to_trace_create(r) for r in records]
+    traces = await service.ingest_spans(trace_creates)
+    for trace in traces:
+        await _broadcast(trace)
+    return traces
 
 
 @router.get("/traces/{trace_id}", response_model=TraceResponse)

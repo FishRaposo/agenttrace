@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import pytest
-
 from agenttrace.hybrid_client import HybridLLMClient, HybridResponse
 
 
@@ -11,7 +10,9 @@ class TestHybridLLMClient:
     def test_sim_mode_default(self) -> None:
         client = HybridLLMClient(mode="sim", seed=42)
         assert client.mode == "sim"
-        resp = client.chat("openai", "gpt-4", messages=[{"role": "user", "content": "hello"}])
+        resp = client.chat(
+            "openai", "gpt-4", messages=[{"role": "user", "content": "hello"}]
+        )
         assert isinstance(resp, HybridResponse)
         assert resp.content
         assert resp.prompt_tokens > 0
@@ -22,15 +23,21 @@ class TestHybridLLMClient:
     def test_sim_mode_deterministic(self) -> None:
         """Same prompt + seed should yield same response."""
         client = HybridLLMClient(mode="sim", seed=42)
-        r1 = client.chat("openai", "gpt-4", messages=[{"role": "user", "content": "test"}])
-        r2 = client.chat("openai", "gpt-4", messages=[{"role": "user", "content": "test"}])
+        r1 = client.chat(
+            "openai", "gpt-4", messages=[{"role": "user", "content": "test"}]
+        )
+        r2 = client.chat(
+            "openai", "gpt-4", messages=[{"role": "user", "content": "test"}]
+        )
         assert r1.content == r2.content
         assert r1.prompt_tokens == r2.prompt_tokens
         assert r1.completion_tokens == r2.completion_tokens
 
     def test_sim_mode_anthropic(self) -> None:
         client = HybridLLMClient(mode="sim", seed=42)
-        resp = client.chat("anthropic", "claude-3", messages=[{"role": "user", "content": "hi"}])
+        resp = client.chat(
+            "anthropic", "claude-3", messages=[{"role": "user", "content": "hi"}]
+        )
         assert resp.provider == "anthropic"
         assert resp.total_tokens > 0
 

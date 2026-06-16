@@ -35,7 +35,11 @@ class _RunState:
     """
 
     def __init__(
-        self, run_id: str, name: str, metadata: Optional[dict[str, Any]] = None, correlation_id: Optional[str] = None
+        self,
+        run_id: str,
+        name: str,
+        metadata: Optional[dict[str, Any]] = None,
+        correlation_id: Optional[str] = None,
     ) -> None:
         self.id: str = run_id
         self.correlation_id: Optional[str] = correlation_id
@@ -99,7 +103,10 @@ class Tracer:
         self._exporter = exporter
 
     def start_run(
-        self, name: str, metadata: Optional[dict[str, Any]] = None, correlation_id: Optional[str] = None
+        self,
+        name: str,
+        metadata: Optional[dict[str, Any]] = None,
+        correlation_id: Optional[str] = None,
     ) -> _RunContext:
         """Start a new trace run.
 
@@ -115,12 +122,16 @@ class Tracer:
             RuntimeError: If a run is already in progress.
         """
         if self._current_run is not None:
-            raise RuntimeError("A run is already in progress. End the current run first.")
+            raise RuntimeError(
+                "A run is already in progress. End the current run first."
+            )
 
         run_id = str(uuid.uuid4())
         # Head-based deterministic sampling
         self._sampled = self._is_sampled(run_id)
-        run_state = _RunState(run_id=run_id, name=name, metadata=metadata, correlation_id=correlation_id)
+        run_state = _RunState(
+            run_id=run_id, name=name, metadata=metadata, correlation_id=correlation_id
+        )
         self._current_run = run_state
         RunContext.set_current_run(run_id, metadata)
         if correlation_id:
@@ -149,6 +160,7 @@ class Tracer:
         if self._sample_rate <= 0.0:
             return False
         import hashlib
+
         digest = hashlib.md5(run_id.encode()).hexdigest()
         value = int(digest[:8], 16) / 0xFFFFFFFF
         return value < self._sample_rate
@@ -203,14 +215,10 @@ class Tracer:
             RuntimeError: If the span is not the current active span.
         """
         if not self._span_stack or self._span_stack[-1].id != span.id:
-            raise RuntimeError(
-                "Span mismatch. Spans must be ended in LIFO order."
-            )
+            raise RuntimeError("Span mismatch. Spans must be ended in LIFO order.")
 
         self._span_stack.pop()
-        RunContext.set_current_span(
-            self._span_stack[-1] if self._span_stack else None
-        )
+        RunContext.set_current_span(self._span_stack[-1] if self._span_stack else None)
 
         if self._exporter is not None and self._sampled:
             self._exporter.export_span(span.to_dict())
@@ -261,6 +269,7 @@ class Tracer:
             return
 
         from datetime import datetime, timezone
+
         event = {
             "event_type": event_type,
             "timestamp": datetime.now(timezone.utc).isoformat(),
@@ -279,7 +288,12 @@ class Tracer:
                 self._current_run.metadata = {}
             self._current_run.metadata.setdefault("events", []).append(event)
 
-    def run(self, name: str, metadata: Optional[dict[str, Any]] = None, correlation_id: Optional[str] = None) -> _RunContext:
+    def run(
+        self,
+        name: str,
+        metadata: Optional[dict[str, Any]] = None,
+        correlation_id: Optional[str] = None,
+    ) -> _RunContext:
         """Alias for start_run() for ergonomic usage.
 
         Args:
@@ -290,7 +304,9 @@ class Tracer:
         Returns:
             A context manager for the run.
         """
-        return self.start_run(name=name, metadata=metadata, correlation_id=correlation_id)
+        return self.start_run(
+            name=name, metadata=metadata, correlation_id=correlation_id
+        )
 
     def span(
         self,
@@ -308,7 +324,9 @@ class Tracer:
         Returns:
             A context manager for the span.
         """
-        return _SpanContext(tracer=self, name=name, span_type=span_type, metadata=metadata)
+        return _SpanContext(
+            tracer=self, name=name, span_type=span_type, metadata=metadata
+        )
 
 
 class _RunContext:

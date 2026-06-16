@@ -1,69 +1,49 @@
-PYTHON	:= python
-PIP		:= pip
-NPM		:= npm
+PYTHON := python
+NPM    := npm
 
-.PHONY: help demo install test lint format clean setup sdk-test server-test dashboard-test dev
+.PHONY: install dev test sdk-test server-test dashboard-test lint format typecheck \
+        docker-up docker-down demo clean help
 
-help:
-	@echo "AgentTrace - Available targets:"
-	@echo ""
-	@echo "  demo            Quick demo: start services, run sample trace"
-	@echo "  install         Install all dependencies (SDK + Server + Dashboard)"
-	@echo "  test            Run all tests"
-	@echo "  sdk-test        Run SDK tests"
-	@echo "  server-test     Run server tests"
-	@echo "  dashboard-test  Run dashboard Playwright tests"
-	@echo "  lint            Run ruff + mypy on Python code"
-	@echo "  format          Run ruff format"
-	@echo "  clean           Remove build artifacts and caches"
-	@echo "  setup           First-time setup"
-	@echo "  dev             Start docker compose"
-
-install:
-	cd sdk && $(PIP) install -e ".[dev]"
-	cd server && $(PIP) install -e ".[dev]"
+install: ## Install shared-core, the SDK (standalone), server, and dashboard deps
+	pip install -e ../shared-core
+	pip install -e sdk
+	pip install -e "server[dev]"
 	cd dashboard && $(NPM) install
 
-test: sdk-test server-test
+dev: ## Run the collector server locally (uvicorn on :8000)
+	cd server && uvicorn app.main:app --reload --port 8000
 
-sdk-test:
-	cd sdk && $(PYTHON) -m pytest tests/ -v
+test: sdk-test server-test ## Run SDK + server test suites
 
-server-test:
-	cd server && $(PYTHON) -m pytest tests/ -v
+sdk-test: ## Run SDK tests (standalone — no shared-core)
+	cd sdk && $(PYTHON) -m pytest -q
 
-dashboard-test:
+server-test: ## Run server tests
+	cd server && $(PYTHON) -m pytest -q
+
+dashboard-test: ## Run dashboard Playwright tests
 	cd dashboard && npx playwright test --project=chromium
 
-lint:
-	cd sdk && ruff check . && mypy agenttrace
-	cd server && ruff check . && mypy app
+lint: ## Lint server + SDK + examples with ruff
+	ruff check server/app sdk/agenttrace examples server/tests sdk/tests
 
-format:
-	cd sdk && ruff format .
-	cd server && ruff format .
+format: ## Format Python code with ruff
+	ruff format server/app sdk/agenttrace examples server/tests sdk/tests
 
-clean:
-	$(PYTHON) -c "import shutil, glob; dirs = glob.glob('**/__pycache__', recursive=True) + glob.glob('**/.pytest_cache', recursive=True) + glob.glob('**/*.egg-info', recursive=True); [shutil.rmtree(d) for d in dirs if __import__('pathlib').Path(d).exists()]"
-	rm -rf dashboard/.next dashboard/node_modules/.cache
+typecheck: ## Type-check server + SDK with pyright
+	pyright server/app sdk/agenttrace
 
-setup: install
-	cd server && alembic upgrade head
-
-demo:
-	@echo "🚀 Starting AgentTrace demo..."
+docker-up: ## Start Postgres + Redis + server + dashboard
 	docker compose up -d
-	@echo "⏳ Waiting for services to be healthy..."
-	@python -c "import time, urllib.request; \
-		[urllib.request.urlopen('http://localhost:8000/health') and exit(0) \
-		for _ in range(30) if (time.sleep(1) or True)]" || echo "Warning: server not responding, continuing anyway"
-	@echo "📊 Seeding demo data..."
-	$(PYTHON) scripts/seed_demo.py --endpoint http://localhost:8000/api
-	@echo "✅ Demo ready!"
-	@echo "   Dashboard: http://localhost:3000"
-	@echo "   API:       http://localhost:8000"
-	@echo ""
-	@echo "To stop: docker compose down"
 
-dev:
-	docker compose up -d
+docker-down: ## Stop all containers
+	docker compose down
+
+demo: ## Run the offline SDK tracing demo (JSONL export)
+	$(PYTHON) examples/run_demo.py
+
+clean: ## Remove caches
+	$(PYTHON) -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('.pytest_cache')]; shutil.rmtree('.ruff_cache', ignore_errors=True)"
+
+help: ## Show this help message
+	@grep -E '^[a-zA-Z_-]+:.*?## .*$$' $(MAKEFILE_LIST) | sort | awk 'BEGIN {FS = ":.*?## "}; {printf "\033[36m%-16s\033[0m %s\n", $$1, $$2}'

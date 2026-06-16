@@ -8,10 +8,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, get_optional_user
 from app.db import get_session
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceResponse
-from app.api.auth import get_optional_user, User
 
 router = APIRouter()
 
@@ -76,12 +76,14 @@ async def list_runs(
     offset: int = Query(0, ge=0, description="Page offset"),
     session: AsyncSession = Depends(get_session),
 ) -> RunListResponse:
-    """List runs with pagination, status filtering, name search, and correlation ID filtering.
+    """List runs with pagination, status filtering, name search, and
+    correlation ID filtering.
 
     Args:
         status: Optional status filter.
         search: Optional name search (case-insensitive partial match).
-        correlation_id: Optional correlation ID filter for multi-agent trace correlation.
+        correlation_id: Optional correlation ID filter for multi-agent trace
+            correlation.
         limit: Maximum number of runs per page.
         offset: Page offset.
         session: Async database session.

@@ -70,7 +70,8 @@ def main() -> None:
     print(f"\nFinal summary: {summary}")
     tracer.flush()
     print(
-        f"\nTraces flushed. Filter dashboard by correlation_id={correlation_id} to see both agents."
+        f"\nTraces flushed. Filter dashboard by correlation_id={correlation_id} "
+        "to see both agents."
     )
 
 

@@ -1,9 +1,8 @@
-import pytest
-from unittest.mock import MagicMock, AsyncMock
-from agenttrace.tracer import Tracer
-from agenttrace.instrumentation.openai import OpenAIInstrumentor
+from unittest.mock import AsyncMock, MagicMock
+
 from agenttrace.instrumentation.fastapi import FastAPIInstrumentor
 from agenttrace.instrumentation.llamaindex import LlamaIndexInstrumentor
+from agenttrace.instrumentation.openai import OpenAIInstrumentor
 
 
 def test_openai_instrumentor_lifecycle(tracer):
@@ -12,6 +11,7 @@ def test_openai_instrumentor_lifecycle(tracer):
 
     # Mock completions classes to avoid actual import/connection requirements
     import sys
+
     mock_openai = MagicMock()
     mock_openai.resources.chat.completions.Completions.create = MagicMock()
     mock_openai.resources.chat.completions.AsyncCompletions.create = AsyncMock()
@@ -29,6 +29,7 @@ def test_openai_instrumentor_lifecycle(tracer):
 class MockFastAPI:
     def __init__(self, *args, **kwargs):
         pass
+
     def add_middleware(self, middleware_class, **kwargs):
         pass
 
@@ -39,10 +40,11 @@ def test_fastapi_instrumentor_lifecycle(tracer):
 
     # Mock fastapi and starlette
     import sys
+
     mock_fastapi = MagicMock()
     mock_fastapi.FastAPI = MockFastAPI
     sys.modules["fastapi"] = mock_fastapi
-    
+
     mock_starlette = MagicMock()
     sys.modules["starlette"] = mock_starlette
     sys.modules["starlette.middleware.base"] = MagicMock()
@@ -67,6 +69,7 @@ def test_llamaindex_instrumentor_lifecycle(tracer):
     assert not instrumentor.is_instrumented()
 
     import sys
+
     mock_llama = MagicMock()
     mock_llama.core.Settings = MagicMock()
     mock_llama.core.callbacks.CallbackManager = MagicMock()

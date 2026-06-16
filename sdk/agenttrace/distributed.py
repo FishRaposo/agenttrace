@@ -7,9 +7,32 @@ W3C Trace Context standard.
 from __future__ import annotations
 
 import re
+import uuid
 from typing import Any, Optional
 
 from agenttrace.context import RunContext
+
+
+def _to_trace_id_hex(value: str) -> str:
+    """Normalize an id to a 32-hex W3C trace id.
+
+    Accepts dashed UUIDs (e.g. a run_id) or arbitrary strings; falls back to a
+    zero-padded/truncated hex form so the resulting traceparent is valid.
+    """
+    try:
+        return uuid.UUID(value).hex
+    except (ValueError, AttributeError, TypeError):
+        cleaned = re.sub(r"[^0-9a-f]", "", value.lower())
+        return cleaned[:32].rjust(32, "0")
+
+
+def _to_span_id_hex(value: str) -> str:
+    """Normalize an id to a 16-hex W3C span id."""
+    try:
+        return uuid.UUID(value).hex[:16]
+    except (ValueError, AttributeError, TypeError):
+        cleaned = re.sub(r"[^0-9a-f]", "", value.lower())
+        return cleaned[:16].rjust(16, "0")
 
 
 class TraceContext:
@@ -49,11 +72,13 @@ class TraceContext:
     @staticmethod
     def _generate_trace_id() -> str:
         import uuid
+
         return uuid.uuid4().hex
 
     @staticmethod
     def _generate_span_id() -> str:
         import uuid
+
         return uuid.uuid4().hex[:16]
 
     def to_traceparent(self) -> str:
@@ -99,7 +124,9 @@ class ContextPropagator:
     def __init__(self, format: str = "w3c") -> None:
         self.format = format
 
-    def inject(self, trace_context: TraceContext, carrier: dict[str, str]) -> dict[str, str]:
+    def inject(
+        self, trace_context: TraceContext, carrier: dict[str, str]
+    ) -> dict[str, str]:
         if self.format == "w3c":
             carrier.update(trace_context.to_headers())
         elif self.format == "b3":
@@ -164,11 +191,19 @@ class DistributedTracer:
         """
         current_span = RunContext.get_current_span()
         if current_span:
-            # Use run_id as distributed trace id, span.id as parent
-            trace_id = RunContext.get_current_correlation_id() or getattr(current_span, "run_id", None)
+            # Use run_id as distributed trace id, span.id as parent.
+            # run_id/span.id are dashed 36-char UUIDs; the W3C traceparent
+            # spec requires 32-hex trace ids and 16-hex span ids, so normalize
+            # to hex before building the header or the round-trip silently fails.
+            trace_id = RunContext.get_current_correlation_id() or getattr(
+                current_span, "run_id", None
+            )
             span_id = getattr(current_span, "id", None)
             if trace_id and span_id:
-                context = TraceContext(trace_id=trace_id, parent_id=span_id)
+                context = TraceContext(
+                    trace_id=_to_trace_id_hex(trace_id),
+                    parent_id=_to_span_id_hex(span_id),
+                )
                 return self.propagator.inject(context, headers)
         return headers
 

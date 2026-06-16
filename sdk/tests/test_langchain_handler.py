@@ -1,7 +1,9 @@
-"""Tests for LangChain callback handler using stub callbacks (no langchain dep required)."""
+"""Tests for LangChain callback handler using stub callbacks.
+
+No langchain dependency required.
+"""
 
 from __future__ import annotations
-
 
 from agenttrace import Tracer
 from agenttrace.instrumentation.langchain import AgentTraceCallbackHandler

@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import pytest
-
-from agenttrace.span import SpanType, SpanStatus
-from agenttrace.tracer import Tracer, RunStatus
+from agenttrace.span import SpanStatus, SpanType
+from agenttrace.tracer import RunStatus, Tracer
 
 
 class TestTracerRunLifecycle:
@@ -18,12 +17,14 @@ class TestTracerRunLifecycle:
     def test_start_run_sets_current_run_id(self, tracer: Tracer) -> None:
         tracer.start_run("test_run")
         from agenttrace.context import RunContext
+
         assert RunContext.get_current_run_id() is not None
 
     def test_end_run_clears_context(self, tracer: Tracer) -> None:
         tracer.start_run("test_run")
         tracer.end_run(RunStatus.COMPLETED)
         from agenttrace.context import RunContext
+
         assert RunContext.get_current_run_id() is None
 
     def test_cannot_start_two_runs(self, tracer: Tracer) -> None:
@@ -40,15 +41,17 @@ class TestTracerRunLifecycle:
         with tracer.run("ctx_run") as run:
             assert run.name == "ctx_run"
         from agenttrace.context import RunContext
+
         assert RunContext.get_current_run_id() is None
 
     def test_run_context_manager_on_exception(self, tracer: Tracer) -> None:
         try:
-            with tracer.run("failing_run") as run:
+            with tracer.run("failing_run") as _run:
                 raise ValueError("boom")
         except ValueError:
             pass
         from agenttrace.context import RunContext
+
         assert RunContext.get_current_run_id() is None
 
 
@@ -96,7 +99,7 @@ class TestTracerSpanLifecycle:
     def test_span_mismatch_raises(self, tracer: Tracer) -> None:
         tracer.start_run("test_run")
         span1 = tracer.start_span("first")
-        span2 = tracer.start_span("second")
+        _span2 = tracer.start_span("second")
         with pytest.raises(RuntimeError, match="Span mismatch"):
             tracer.end_span(span1)
         tracer.end_run()
@@ -105,19 +108,24 @@ class TestTracerSpanLifecycle:
 class TestTracerWithExporter:
     """Tests for tracer-exporter integration."""
 
-    def test_run_exports_to_jsonl(self, tracer_with_jsonl: Tracer, jsonl_path: str) -> None:
+    def test_run_exports_to_jsonl(
+        self, tracer_with_jsonl: Tracer, jsonl_path: str
+    ) -> None:
         tracer_with_jsonl.start_run("exported_run")
         tracer_with_jsonl.end_run()
         tracer_with_jsonl.flush()
 
         import json
+
         with open(jsonl_path, "r") as f:
             lines = f.readlines()
         assert len(lines) >= 1
         data = json.loads(lines[0])
         assert data["type"] == "run"
 
-    def test_span_exports_to_jsonl(self, tracer_with_jsonl: Tracer, jsonl_path: str) -> None:
+    def test_span_exports_to_jsonl(
+        self, tracer_with_jsonl: Tracer, jsonl_path: str
+    ) -> None:
         tracer_with_jsonl.start_run("exported_run")
         span = tracer_with_jsonl.start_span("my_span")
         span.end(output="result")
@@ -126,7 +134,10 @@ class TestTracerWithExporter:
         tracer_with_jsonl.flush()
 
         import json
+
         with open(jsonl_path, "r") as f:
             lines = f.readlines()
-        span_lines = [json.loads(l) for l in lines if json.loads(l)["type"] == "span"]
+        span_lines = [
+            json.loads(ln) for ln in lines if json.loads(ln)["type"] == "span"
+        ]
         assert len(span_lines) >= 1

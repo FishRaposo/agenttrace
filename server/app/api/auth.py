@@ -22,7 +22,9 @@ from app.models.user import User as UserDB
 router = APIRouter()
 
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token")
-optional_oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/api/auth/token", auto_error=False)
+optional_oauth2_scheme = OAuth2PasswordBearer(
+    tokenUrl="/api/auth/token", auto_error=False
+)
 
 
 class User(BaseModel):

@@ -80,7 +80,10 @@ async def stream_traces(request: Request) -> StreamingResponse:
                             "duration_ms": trace.duration_ms,
                             "cost_usd": trace.cost_usd,
                         }
-                        yield f"id: {trace.id}\ndata: {json.dumps(payload, default=str)}\n\n"
+                        yield (
+                            f"id: {trace.id}\n"
+                            f"data: {json.dumps(payload, default=str)}\n\n"
+                        )
             except Exception:
                 logger.warning("SSE polling error", exc_info=True)
 

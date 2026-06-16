@@ -37,26 +37,36 @@ def _post(path: str, payload: dict) -> tuple[int, float]:
 
 
 def create_run(name: str) -> str:
-    status, latency = _post("/runs", {
-        "name": name,
-        "status": "completed",
-        "start_time": datetime.now(timezone.utc).isoformat(),
-    })
+    status, latency = _post(
+        "/runs",
+        {
+            "name": name,
+            "status": "completed",
+            "start_time": datetime.now(timezone.utc).isoformat(),
+        },
+    )
     return f"run-{name}"
 
 
 def ingest_trace(run_id: str, span_id: str) -> float:
-    _, latency = _post("/traces", {
-        "run_id": run_id,
-        "span_id": span_id,
-        "span_type": "llm_call",
-        "name": "benchmark-span",
-        "start_time": datetime.now(timezone.utc).isoformat(),
-        "status": "completed",
-        "duration_ms": 150.0,
-        "cost_usd": 0.001,
-        "token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
-    })
+    _, latency = _post(
+        "/traces",
+        {
+            "run_id": run_id,
+            "span_id": span_id,
+            "span_type": "llm_call",
+            "name": "benchmark-span",
+            "start_time": datetime.now(timezone.utc).isoformat(),
+            "status": "completed",
+            "duration_ms": 150.0,
+            "cost_usd": 0.001,
+            "token_usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
+        },
+    )
     return latency
 
 
@@ -71,7 +81,11 @@ def ingest_batch(run_id: str, batch_size: int) -> float:
             "status": "completed",
             "duration_ms": 150.0,
             "cost_usd": 0.001,
-            "token_usage": {"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            "token_usage": {
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
         }
         for i in range(batch_size)
     ]
@@ -111,22 +125,25 @@ def benchmark() -> None:
     print(f"  Total time: {total:.2f}s")
     print(f"  Throughput: {100 / total:.1f} traces/sec")
     print(f"  Avg latency: {sum(latencies) / len(latencies) * 1000:.1f}ms")
-    print(f"  P95 latency: {sorted(latencies)[int(len(latencies) * 0.95)] * 1000:.1f}ms")
+    print(
+        f"  P95 latency: {sorted(latencies)[int(len(latencies) * 0.95)] * 1000:.1f}ms"
+    )
 
     # Concurrent trace throughput
     print("\n[Concurrent] 10 workers x 50 traces = 500 traces...")
     start = time.perf_counter()
     with ThreadPoolExecutor(max_workers=10) as pool:
         futures = [
-            pool.submit(ingest_trace, run_id, f"concurrent-{i}")
-            for i in range(500)
+            pool.submit(ingest_trace, run_id, f"concurrent-{i}") for i in range(500)
         ]
         latencies = [f.result() for f in futures]
     total = time.perf_counter() - start
     print(f"  Total time: {total:.2f}s")
     print(f"  Throughput: {500 / total:.1f} traces/sec")
     print(f"  Avg latency: {sum(latencies) / len(latencies) * 1000:.1f}ms")
-    print(f"  P95 latency: {sorted(latencies)[int(len(latencies) * 0.95)] * 1000:.1f}ms")
+    print(
+        f"  P95 latency: {sorted(latencies)[int(len(latencies) * 0.95)] * 1000:.1f}ms"
+    )
 
     # Batch throughput
     print("\n[Batch] 10 batches x 50 traces = 500 traces...")

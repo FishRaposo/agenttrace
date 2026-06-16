@@ -6,9 +6,9 @@ import functools
 import re
 from typing import Any, Callable, Optional, ParamSpec, TypeVar
 
+from agenttrace.cost_tracker import CostTracker
 from agenttrace.span import SpanType
 from agenttrace.tracer import Tracer
-from agenttrace.cost_tracker import CostTracker
 
 P = ParamSpec("P")
 R = TypeVar("R")
@@ -43,15 +43,11 @@ def _extract_token_usage(result: Any) -> Optional[dict[str, int]]:
                 usage_data = usage_attr
             else:
                 usage_data = {
-                    k: v
-                    for k, v in vars(usage_attr).items()
-                    if isinstance(v, int)
+                    k: v for k, v in vars(usage_attr).items() if isinstance(v, int)
                 }
         elif usage_metadata_attr is not None:
             usage_data = {
-                k: v
-                for k, v in vars(usage_metadata_attr).items()
-                if isinstance(v, int)
+                k: v for k, v in vars(usage_metadata_attr).items() if isinstance(v, int)
             }
 
     if usage_data is None and isinstance(result, str):
@@ -108,7 +104,7 @@ def _parse_token_string(text: str) -> Optional[dict[str, int]]:
     return extracted
 
 
-def trace_llm(
+def trace_llm(  # noqa: C901
     tracer: Tracer,
     model: str = "unknown",
     provider: str = "openai",
@@ -142,7 +138,7 @@ def trace_llm(
 
     cost_tracker = CostTracker()
 
-    def decorator(func: Callable[P, R]) -> Callable[P, R]:
+    def decorator(func: Callable[P, R]) -> Callable[P, R]:  # noqa: C901
         @functools.wraps(func)
         def wrapper(*args: P.args, **kwargs: P.kwargs) -> R:
             # Resolve pricing if not explicitly set
@@ -188,10 +184,9 @@ def trace_llm(
                 if usage is not None:
                     span.token_usage = usage
                     # Rates from CostTracker are per-1k tokens; divide by 1000
-                    span.cost_usd = (
-                        usage["prompt_tokens"] * (prompt_rate / 1000)
-                        + usage["completion_tokens"] * (completion_rate / 1000)
-                    )
+                    span.cost_usd = usage["prompt_tokens"] * (
+                        prompt_rate / 1000
+                    ) + usage["completion_tokens"] * (completion_rate / 1000)
                     cost_tracker.record_cost(
                         trace_id=getattr(span, "run_id", None) or span.id,
                         provider=provider,

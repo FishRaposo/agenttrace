@@ -5,13 +5,10 @@ from __future__ import annotations
 from typing import AsyncGenerator
 
 import pytest_asyncio
+from app.db import Base, get_session
+from app.main import app
 from httpx import ASGITransport, AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker, create_async_engine
-
-from app.db import Base
-from app.main import app
-from app.db import get_session
-
 
 TEST_DATABASE_URL = "sqlite+aiosqlite:///./test_agenttrace.db"
 

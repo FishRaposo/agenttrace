@@ -6,8 +6,8 @@ import json
 import os
 from typing import Any
 
-from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.exporters.api_exporter import APIExporter
+from agenttrace.exporters.jsonl import JSONLExporter
 
 
 class TestJSONLExporter:

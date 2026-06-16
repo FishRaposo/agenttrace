@@ -15,6 +15,7 @@ from typing import Any
 @dataclass
 class CostRecord:
     """Cost record for a trace."""
+
     trace_id: str
     provider: str
     model: str
@@ -28,7 +29,7 @@ class CostRecord:
 
 class CostTracker:
     """Track costs for AgentTrace spans.
-    
+
     Features:
     - Per-trace cost attribution
     - Per-workflow cost aggregation
@@ -36,7 +37,7 @@ class CostTracker:
     - Budget threshold alerts
     - External pricing file override
     """
-    
+
     # Provider pricing per 1K tokens
     PRICING = {
         "openai": {
@@ -57,13 +58,13 @@ class CostTracker:
             "claude-3-5-haiku": {"prompt": 0.001, "completion": 0.005},
         },
     }
-    
+
     def __init__(self) -> None:
         """Initialize cost tracker with optional external pricing override."""
         self.records: list[CostRecord] = []
         self._pricing = dict(self.PRICING)
         self._load_external_pricing()
-    
+
     def _load_external_pricing(self) -> None:
         """Load pricing from external JSON/YAML file if available."""
         paths = [
@@ -81,6 +82,7 @@ class CostTracker:
                         if path.suffix in (".yaml", ".yml"):
                             try:
                                 import yaml
+
                                 data = yaml.safe_load(f)
                             except ImportError:
                                 continue
@@ -88,28 +90,32 @@ class CostTracker:
                             data = json.load(f)
                     if isinstance(data, dict):
                         for k, v in data.items():
-                            if k in self._pricing and isinstance(self._pricing[k], dict) and isinstance(v, dict):
+                            if (
+                                k in self._pricing
+                                and isinstance(self._pricing[k], dict)
+                                and isinstance(v, dict)
+                            ):
                                 self._pricing[k].update(v)
                             else:
                                 self._pricing[k] = v
                 except Exception:
                     pass
                 break
-    
+
     @property
     def pricing(self) -> dict[str, dict[str, dict[str, float]]]:
         """Return current pricing table (includes external overrides)."""
         return self._pricing
-    
+
     def get_pricing(self, provider: str, model: str) -> dict[str, float] | None:
         """Get pricing for a provider/model.
- 
+
         Returns:
             Dict with 'prompt' and 'completion' per-1k-token rates, or None.
         """
         provider_pricing = self._pricing.get(provider, {})
         return provider_pricing.get(model)
- 
+
     def calculate_cost(
         self,
         provider: str,
@@ -120,12 +126,14 @@ class CostTracker:
         """Calculate cost for a request."""
         provider_pricing = self._pricing.get(provider, {})
         model_pricing = provider_pricing.get(model, {"prompt": 0.0, "completion": 0.0})
-        
-        prompt_cost = (prompt_tokens / 1000) * model_pricing["prompt"]
-        completion_cost = (completion_tokens / 1000) * model_pricing["completion"]
-        
+
+        prompt_cost = (prompt_tokens / 1000) * model_pricing.get("prompt", 0.0)
+        completion_cost = (completion_tokens / 1000) * model_pricing.get(
+            "completion", 0.0
+        )
+
         return round(prompt_cost + completion_cost, 6)
-    
+
     def record_cost(
         self,
         trace_id: str,
@@ -139,7 +147,7 @@ class CostTracker:
     ) -> CostRecord:
         """Record cost for a trace."""
         cost = self.calculate_cost(provider, model, prompt_tokens, completion_tokens)
-        
+
         record = CostRecord(
             trace_id=trace_id,
             provider=provider,
@@ -151,18 +159,24 @@ class CostTracker:
             workflow_id=workflow_id,
             feature=feature,
         )
-        
+
         self.records.append(record)
         return record
-    
+
     def get_workflow_cost(self, workflow_id: str) -> dict[str, Any]:
         """Get aggregated cost for a workflow."""
         workflow_records = [r for r in self.records if r.workflow_id == workflow_id]
-        
+
         total_cost = sum(r.cost_usd for r in workflow_records)
-        total_tokens = sum(r.prompt_tokens + r.completion_tokens for r in workflow_records)
-        avg_latency = sum(r.latency_ms for r in workflow_records) / len(workflow_records) if workflow_records else 0
-        
+        total_tokens = sum(
+            r.prompt_tokens + r.completion_tokens for r in workflow_records
+        )
+        avg_latency = (
+            sum(r.latency_ms for r in workflow_records) / len(workflow_records)
+            if workflow_records
+            else 0
+        )
+
         return {
             "workflow_id": workflow_id,
             "total_cost": total_cost,
@@ -170,14 +184,16 @@ class CostTracker:
             "request_count": len(workflow_records),
             "average_latency_ms": avg_latency,
         }
-    
+
     def get_feature_cost(self, feature: str) -> dict[str, Any]:
         """Get aggregated cost for a feature."""
         feature_records = [r for r in self.records if r.feature == feature]
-        
+
         total_cost = sum(r.cost_usd for r in feature_records)
-        total_tokens = sum(r.prompt_tokens + r.completion_tokens for r in feature_records)
-        
+        total_tokens = sum(
+            r.prompt_tokens + r.completion_tokens for r in feature_records
+        )
+
         return {
             "feature": feature,
             "total_cost": total_cost,

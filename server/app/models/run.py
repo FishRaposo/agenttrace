@@ -41,17 +41,23 @@ class Run(Base):
         String(36), index=True, nullable=True
     )
     name: Mapped[str] = mapped_column(String(255), nullable=False)
-    status: Mapped[str] = mapped_column(
-        String(20), nullable=False, default="running"
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="running")
+    start_time: Mapped[datetime] = mapped_column(
+        DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
-    start_time: Mapped[datetime] = mapped_column(DateTime, nullable=False, default=lambda: datetime.now(timezone.utc))
     end_time: Mapped[Optional[datetime]] = mapped_column(DateTime, nullable=True)
     total_cost: Mapped[float] = mapped_column(Float, nullable=False, default=0.0)
     total_tokens: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     span_count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
-    run_metadata: Mapped[Optional[dict]] = mapped_column("run_metadata", JSON, nullable=True)
-    workflow_id: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
-    feature: Mapped[Optional[str]] = mapped_column(String(100), nullable=True, index=True)
+    run_metadata: Mapped[Optional[dict]] = mapped_column(
+        "run_metadata", JSON, nullable=True
+    )
+    workflow_id: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, index=True
+    )
+    feature: Mapped[Optional[str]] = mapped_column(
+        String(100), nullable=True, index=True
+    )
 
 
 class RunCreate(BaseModel):
@@ -71,7 +77,9 @@ class RunCreate(BaseModel):
     """
 
     id: Optional[str] = Field(None, description="Client-provided run identifier")
-    correlation_id: Optional[str] = Field(None, description="Correlation ID for multi-agent trace correlation")
+    correlation_id: Optional[str] = Field(
+        None, description="Correlation ID for multi-agent trace correlation"
+    )
     name: str = Field(..., description="Human-readable run name")
     status: str = Field("running", description="Initial run status")
     start_time: datetime = Field(

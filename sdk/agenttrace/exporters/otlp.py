@@ -10,6 +10,7 @@ from typing import Any, Optional
 
 try:
     import urllib.request
+
     _HAS_URLLIB = True
 except ImportError:
     _HAS_URLLIB = False
@@ -54,11 +55,19 @@ def _span_to_otlp(span_data: dict[str, Any], service_name: str) -> dict[str, Any
         OTLP-compatible span dictionary.
     """
     start_ns = _to_nanos(span_data.get("start_time", ""))
-    end_ns = _to_nanos(span_data.get("end_time", "")) if span_data.get("end_time") else None
+    end_ns = (
+        _to_nanos(span_data.get("end_time", "")) if span_data.get("end_time") else None
+    )
 
     attrs = [
-        {"key": "span.type", "value": {"stringValue": span_data.get("span_type", "custom")}},
-        {"key": "span.status", "value": {"stringValue": span_data.get("status", "unknown")}},
+        {
+            "key": "span.type",
+            "value": {"stringValue": span_data.get("span_type", "custom")},
+        },
+        {
+            "key": "span.status",
+            "value": {"stringValue": span_data.get("status", "unknown")},
+        },
     ]
     if span_data.get("cost_usd") is not None:
         attrs.append(
@@ -67,7 +76,10 @@ def _span_to_otlp(span_data: dict[str, Any], service_name: str) -> dict[str, Any
     if span_data.get("token_usage"):
         tu = span_data["token_usage"]
         attrs.append(
-            {"key": "tokens.total", "value": {"intValue": str(tu.get("total_tokens", 0))}}
+            {
+                "key": "tokens.total",
+                "value": {"intValue": str(tu.get("total_tokens", 0))},
+            }
         )
     if span_data.get("error"):
         attrs.append(
@@ -150,21 +162,39 @@ class OTLPExporter(BaseExporter):
         )
 
         attrs: list[dict[str, Any]] = [
-            {"key": "run.name", "value": {"stringValue": run_data.get("name", "unknown")}},
-            {"key": "run.status", "value": {"stringValue": run_data.get("status", "unknown")}},
-            {"key": "run.span_count", "value": {"intValue": str(run_data.get("span_count", 0))}},
+            {
+                "key": "run.name",
+                "value": {"stringValue": run_data.get("name", "unknown")},
+            },
+            {
+                "key": "run.status",
+                "value": {"stringValue": run_data.get("status", "unknown")},
+            },
+            {
+                "key": "run.span_count",
+                "value": {"intValue": str(run_data.get("span_count", 0))},
+            },
         ]
         if run_data.get("correlation_id"):
             attrs.append(
-                {"key": "run.correlation_id", "value": {"stringValue": run_data["correlation_id"]}}
+                {
+                    "key": "run.correlation_id",
+                    "value": {"stringValue": run_data["correlation_id"]},
+                }
             )
         if run_data.get("total_cost"):
             attrs.append(
-                {"key": "run.total_cost", "value": {"doubleValue": run_data["total_cost"]}}
+                {
+                    "key": "run.total_cost",
+                    "value": {"doubleValue": run_data["total_cost"]},
+                }
             )
         if run_data.get("total_tokens"):
             attrs.append(
-                {"key": "run.total_tokens", "value": {"intValue": str(run_data["total_tokens"])}}
+                {
+                    "key": "run.total_tokens",
+                    "value": {"intValue": str(run_data["total_tokens"])},
+                }
             )
 
         otlp_span: dict[str, Any] = {

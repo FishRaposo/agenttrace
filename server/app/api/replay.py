@@ -41,9 +41,7 @@ async def get_replay_data(
         raise HTTPException(status_code=404, detail="Run not found")
 
     spans_stmt = (
-        select(Trace)
-        .where(Trace.run_id == run_id)
-        .order_by(Trace.start_time.asc())
+        select(Trace).where(Trace.run_id == run_id).order_by(Trace.start_time.asc())
     )
     spans_result = await session.execute(spans_stmt)
     spans = list(spans_result.scalars().all())

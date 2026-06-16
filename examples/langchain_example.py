@@ -17,6 +17,7 @@ os.environ.setdefault("AGENTTRACE_LLM_MODE", "sim")
 from agenttrace import Tracer
 from agenttrace.exporters.api_exporter import APIExporter
 from agenttrace.instrumentation.langchain import LangChainInstrumentor
+from agenttrace.span import SpanType
 
 
 def main() -> None:
@@ -32,7 +33,9 @@ def main() -> None:
     # Create a simple mock "chain" for demonstration
     # (This avoids requiring langchain to be installed for the demo)
     try:
-        from langchain_core.runnables import RunnableLambda  # type: ignore[import-untyped]
+        from langchain_core.runnables import (
+            RunnableLambda,  # type: ignore[import-untyped]
+        )
 
         chain = RunnableLambda(lambda x: f"Processed: {x}")
         result = chain.invoke("Hello, AgentTrace!")
@@ -40,11 +43,17 @@ def main() -> None:
     except ImportError:
         print("langchain not installed; running manual simulation instead")
         # Manual simulation of what the callback handler would trace
-        with tracer.start_run(name="langchain_demo", metadata={"workflow_id": "langchain-example"}) as run:
-            span = tracer.start_span(name="LLMChain", span_type="llm_call")
+        with tracer.start_run(
+            name="langchain_demo", metadata={"workflow_id": "langchain-example"}
+        ) as _run:
+            span = tracer.start_span(name="LLMChain", span_type=SpanType.LLM_CALL)
             span.input_data = {"input": "Hello, AgentTrace!"}
             span.output_data = {"output": "Processed: Hello, AgentTrace!"}
-            span.token_usage = {"prompt_tokens": 10, "completion_tokens": 5, "total_tokens": 15}
+            span.token_usage = {
+                "prompt_tokens": 10,
+                "completion_tokens": 5,
+                "total_tokens": 15,
+            }
             span.cost_usd = 0.0001
             span.end()
             tracer.end_span(span)

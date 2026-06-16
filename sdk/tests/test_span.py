@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from agenttrace.span import Span, SpanType, SpanStatus
+from agenttrace.span import Span, SpanStatus, SpanType
 
 
 class TestSpanCreation:
@@ -83,7 +83,11 @@ class TestSpanSerialization:
         span = Span(
             name="test",
             cost_usd=0.005,
-            token_usage={"prompt_tokens": 100, "completion_tokens": 50, "total_tokens": 150},
+            token_usage={
+                "prompt_tokens": 100,
+                "completion_tokens": 50,
+                "total_tokens": 150,
+            },
         )
         d = span.to_dict()
         assert d["cost_usd"] == 0.005

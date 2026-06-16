@@ -3,21 +3,20 @@
 from __future__ import annotations
 
 import argparse
-import random
 import time
 
 from agenttrace import Tracer
-from agenttrace.exporters.api import APIExporter
+from agenttrace.exporters.api_exporter import APIExporter
 from agenttrace.exporters.jsonl import JSONLExporter
-from agenttrace.span import SpanType
-from agenttrace.tracer import RunStatus
 from agenttrace.wrappers import trace_llm, trace_tool
 
 
 def setup_tracer(exporter_type: str = "api") -> Tracer:
     tracer = Tracer()
     if exporter_type == "api":
-        tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api/traces", buffer_size=1))
+        tracer.set_exporter(
+            APIExporter(endpoint="http://localhost:8000/api/traces", buffer_size=1)
+        )
     else:
         tracer.set_exporter(JSONLExporter("data/research_traces.jsonl", buffer_size=1))
     return tracer
@@ -38,9 +37,21 @@ def web_search(query: str) -> list[dict[str, str]]:
     """
     time.sleep(0.1)
     return [
-        {"title": f"Introduction to {query}", "url": "https://example.com/intro", "snippet": f"A comprehensive guide to {query}"},
-        {"title": f"{query} in Practice", "url": "https://example.com/practice", "snippet": f"Real-world applications of {query}"},
-        {"title": f"Advanced {query}", "url": "https://example.com/advanced", "snippet": f"Deep dive into {query} techniques"},
+        {
+            "title": f"Introduction to {query}",
+            "url": "https://example.com/intro",
+            "snippet": f"A comprehensive guide to {query}",
+        },
+        {
+            "title": f"{query} in Practice",
+            "url": "https://example.com/practice",
+            "snippet": f"Real-world applications of {query}",
+        },
+        {
+            "title": f"Advanced {query}",
+            "url": "https://example.com/advanced",
+            "snippet": f"Deep dive into {query} techniques",
+        },
     ]
 
 
@@ -58,12 +69,20 @@ def parse_content(url: str) -> dict[str, str]:
     return {
         "url": url,
         "title": "Article Title",
-        "content": "This is the parsed content of the article. It contains relevant information.",
+        "content": (
+            "This is the parsed content of the article. "
+            "It contains relevant information."
+        ),
         "word_count": 500,
     }
 
 
-@trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
+@trace_llm(
+    tracer,
+    model="gpt-4",
+    cost_per_prompt_token=0.00003,
+    cost_per_completion_token=0.00006,
+)
 def synthesize_findings(query: str, results: list[dict[str, str]]) -> dict[str, object]:
     """Simulate an LLM call to synthesize research findings.
 
@@ -76,7 +95,9 @@ def synthesize_findings(query: str, results: list[dict[str, str]]) -> dict[str, 
     """
     time.sleep(0.5)
     return {
-        "answer": f"Based on the research about {query}, here are the key findings: ...",
+        "answer": (
+            f"Based on the research about {query}, here are the key findings: ..."
+        ),
         "sources": [r["url"] for r in results[:3]],
         "confidence": 0.85,
         "usage": {
@@ -87,7 +108,12 @@ def synthesize_findings(query: str, results: list[dict[str, str]]) -> dict[str, 
     }
 
 
-@trace_llm(tracer, model="gpt-4", cost_per_prompt_token=0.00003, cost_per_completion_token=0.00006)
+@trace_llm(
+    tracer,
+    model="gpt-4",
+    cost_per_prompt_token=0.00003,
+    cost_per_completion_token=0.00006,
+)
 def generate_followup_questions(query: str, summary: str) -> dict[str, object]:
     """Simulate generating follow-up questions.
 
@@ -141,7 +167,9 @@ def run_research_agent(query: str) -> None:
             print(f"  - {q}")
 
     tracer.flush()
-    exporter_name = "API server" if isinstance(tracer._exporter, APIExporter) else "JSONL file"
+    exporter_name = (
+        "API server" if isinstance(tracer._exporter, APIExporter) else "JSONL file"
+    )
     print(f"\nTrace exported via {exporter_name}")
     print("Dashboard: http://localhost:3000")
     print("API docs:  http://localhost:8000/docs")
@@ -150,8 +178,12 @@ def run_research_agent(query: str) -> None:
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="AgentTrace research agent example")
     parser.add_argument("--query", default="quantum computing", help="Research query")
-    parser.add_argument("--exporter", choices=["api", "jsonl"], default="api",
-                        help="Export target: api (default) sends to server; jsonl writes to file")
+    parser.add_argument(
+        "--exporter",
+        choices=["api", "jsonl"],
+        default="api",
+        help="Export target: api (default) sends to server; jsonl writes to file",
+    )
     args = parser.parse_args()
 
     tracer = setup_tracer(args.exporter)

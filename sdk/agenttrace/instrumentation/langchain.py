@@ -9,7 +9,7 @@ from typing import Any
 
 from agenttrace.instrumentation.base import Instrumentor
 from agenttrace.span import Span, SpanType
-from agenttrace import Tracer
+from agenttrace.tracer import Tracer
 
 
 class LangChainInstrumentor(Instrumentor):
@@ -39,10 +39,14 @@ class LangChainInstrumentor(Instrumentor):
             **kwargs: Options (tracer, etc.).
         """
         try:
-            from langchain.callbacks.base import BaseCallbackHandler
+            from langchain.callbacks.base import (
+                BaseCallbackHandler,  # noqa: F401  # availability probe
+            )
             from langchain.callbacks.manager import CallbackManager
-        except ImportError:
-            raise ImportError("LangChain not installed. Install with: pip install langchain")
+        except ImportError as err:
+            raise ImportError(
+                "LangChain not installed. Install with: pip install langchain"
+            ) from err
 
         handler = AgentTraceCallbackHandler(self.tracer)
         self._original_callback_manager = CallbackManager
@@ -53,6 +57,7 @@ class LangChainInstrumentor(Instrumentor):
                 self.add_handler(handler, inherit=True)
 
         import langchain.callbacks.manager as manager_module
+
         manager_module.CallbackManager = InstrumentedCallbackManager
         self._instrumented = True
 
@@ -60,6 +65,7 @@ class LangChainInstrumentor(Instrumentor):
         """Remove LangChain instrumentation."""
         if self._original_callback_manager:
             import langchain.callbacks.manager as manager_module
+
             manager_module.CallbackManager = self._original_callback_manager
             self._instrumented = False
 
@@ -199,7 +205,9 @@ class AgentTraceCallbackHandler:
             "agent_action",
             {
                 "tool": action.tool if hasattr(action, "tool") else None,
-                "tool_input": action.tool_input if hasattr(action, "tool_input") else None,
+                "tool_input": action.tool_input
+                if hasattr(action, "tool_input")
+                else None,
             },
         )
 
@@ -211,6 +219,8 @@ class AgentTraceCallbackHandler:
         self.tracer.add_event(
             "agent_finish",
             {
-                "return_values": finish.return_values if hasattr(finish, "return_values") else None,
+                "return_values": finish.return_values
+                if hasattr(finish, "return_values")
+                else None,
             },
         )
