@@ -28,6 +28,8 @@ It adds no schema migration or dependency and does not change the standalone SDK
 - `/api/costs/summary?prompt_version=<exact-tag>` filters cost totals and existing breakdowns to
   matching LLM traces; `unversioned` selects missing/empty prompt tags.
 - `/api/costs/reports/daily` returns deterministic, UTC-sorted daily JSON rollups.
+- Aware trace timestamps are normalized to UTC before persistence and before daily bucketing;
+  timezone-naive stored timestamps are interpreted as UTC.
 - `format=csv` returns the same daily rows with a fixed field order and line ending.
 - Optional `day=YYYY-MM-DD` and `prompt_version=<exact-tag>` filters compose.
 - Non-LLM spans remain in the existing unfiltered cost summary but are excluded from prompt and
@@ -41,7 +43,8 @@ Focused API tests were added before production code in `server/tests/test_costs.
 1. grouped and unversioned prompt cost plus exact filtering;
 2. deterministic repeated JSON bytes and matching CSV fields;
 3. UTC day selection, sorted days, totals, latency percentiles, error rate, and exclusion of a
-   deliberately expensive tool span.
+   deliberately expensive tool span;
+4. two timestamps with different offsets that both belong to the same UTC day.
 
 RED command attempted from `server/` before implementation:
 
@@ -60,6 +63,10 @@ E   ModuleNotFoundError: No module named 'pytest_asyncio'
 
 The documented repository `.venv` is absent. No dependency was installed, as required.
 
+The focused timezone regression also could not collect for the same dependency blocker. A
+dependency-free standard-library reproduction confirmed that raw `strftime` produced
+`2026-08-10` for `2026-08-10T23:30:00-03:00`, while UTC normalization produced `2026-08-11`.
+
 ## Verification
 
 Passed:
@@ -67,6 +74,9 @@ Passed:
 ```powershell
 python -m compileall -q server\app server\tests
 # exit 0
+
+python -c "# AST-load and exercise _normalize_utc and _as_utc"
+# utc-helper-regression: passed; both offset examples bucket as 2026-08-11 UTC
 
 git diff --check
 # exit 0; only Git's LF-to-CRLF working-copy notices

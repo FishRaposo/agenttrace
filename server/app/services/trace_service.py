@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Optional
 
 from sqlalchemy import func, select
@@ -10,6 +11,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.models.run import Run, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
+
+
+def _normalize_utc(value: datetime | None) -> datetime | None:
+    """Normalize aware timestamps before timezone-naive database persistence."""
+    if value is None or value.tzinfo is None or value.utcoffset() is None:
+        return value
+    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 class TraceService:
@@ -44,8 +52,8 @@ class TraceService:
             input_data=trace_data.input_data,
             output_data=trace_data.output_data,
             trace_metadata=trace_data.metadata,
-            start_time=trace_data.start_time,
-            end_time=trace_data.end_time,
+            start_time=_normalize_utc(trace_data.start_time),
+            end_time=_normalize_utc(trace_data.end_time),
             duration_ms=trace_data.duration_ms,
             cost_usd=trace_data.cost_usd,
             token_usage=trace_data.token_usage,
@@ -91,8 +99,8 @@ class TraceService:
                 input_data=trace_data.input_data,
                 output_data=trace_data.output_data,
                 trace_metadata=trace_data.metadata,
-                start_time=trace_data.start_time,
-                end_time=trace_data.end_time,
+                start_time=_normalize_utc(trace_data.start_time),
+                end_time=_normalize_utc(trace_data.end_time),
                 duration_ms=trace_data.duration_ms,
                 cost_usd=trace_data.cost_usd,
                 token_usage=trace_data.token_usage,

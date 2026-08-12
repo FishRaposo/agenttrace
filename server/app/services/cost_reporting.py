@@ -5,6 +5,7 @@ from __future__ import annotations
 import csv
 import io
 from collections import defaultdict
+from datetime import datetime, timezone
 from typing import Any, Iterable
 
 from shared_core.llmmetrics import LLMMetrics
@@ -78,6 +79,13 @@ def _stable_summary(metrics: LLMMetrics) -> dict[str, Any]:
     return summary
 
 
+def _as_utc(value: datetime) -> datetime:
+    """Return an aware UTC timestamp, treating naive stored values as UTC."""
+    if value.tzinfo is None or value.utcoffset() is None:
+        return value.replace(tzinfo=timezone.utc)
+    return value.astimezone(timezone.utc)
+
+
 def build_daily_report(
     traces: Iterable[Trace],
     *,
@@ -90,14 +98,16 @@ def build_daily_report(
 
     buckets: dict[str, list[Trace]] = defaultdict(list)
     for trace in llm_traces:
-        key = trace.start_time.strftime("%Y-%m-%d")
+        key = _as_utc(trace.start_time).strftime("%Y-%m-%d")
         if day is None or key == day:
             buckets[key].append(trace)
 
     days: dict[str, Any] = {}
     for key in sorted(buckets):
         metrics = LLMMetrics()
-        for trace in sorted(buckets[key], key=lambda item: (item.start_time, item.id)):
+        for trace in sorted(
+            buckets[key], key=lambda item: (_as_utc(item.start_time), item.id)
+        ):
             _record(metrics, trace)
         days[key] = _stable_summary(metrics)
 
@@ -106,7 +116,9 @@ def build_daily_report(
         report["day"] = day
     else:
         totals = LLMMetrics()
-        for trace in sorted(llm_traces, key=lambda item: (item.start_time, item.id)):
+        for trace in sorted(
+            llm_traces, key=lambda item: (_as_utc(item.start_time), item.id)
+        ):
             _record(totals, trace)
         report["totals"] = _stable_summary(totals)
     if version is not None:

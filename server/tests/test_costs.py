@@ -272,6 +272,60 @@ async def test_daily_cost_report_prompt_filter_has_sorted_days_and_totals(
 
 
 @pytest.mark.asyncio
+async def test_daily_cost_report_buckets_timezone_offsets_by_utc_day(
+    client: AsyncClient,
+) -> None:
+    """Using the source timezone's calendar day instead of UTC must fail."""
+    response = await client.post(
+        "/api/runs",
+        json={
+            "id": "timezone-report-run",
+            "name": "timezone-report-run",
+            "status": "completed",
+            "start_time": "2026-08-10T23:00:00-03:00",
+        },
+    )
+    assert response.status_code == 201
+
+    await _create_cost_trace(
+        client,
+        run_id="timezone-report-run",
+        span_id="west-of-utc",
+        start_time="2026-08-10T23:30:00-03:00",
+        cost_usd=0.01,
+        prompt_tokens=10,
+        completion_tokens=5,
+        duration_ms=100.0,
+        prompt_version="timezone-v1",
+    )
+    await _create_cost_trace(
+        client,
+        run_id="timezone-report-run",
+        span_id="east-of-utc",
+        start_time="2026-08-11T04:30:00+03:00",
+        cost_usd=0.02,
+        prompt_tokens=20,
+        completion_tokens=10,
+        duration_ms=200.0,
+        prompt_version="timezone-v1",
+    )
+
+    report = await client.get(
+        "/api/costs/reports/daily?prompt_version=timezone-v1&format=json"
+    )
+    assert report.status_code == 200
+    assert list(report.json()["days"]) == ["2026-08-11"]
+    assert report.json()["days"]["2026-08-11"]["total_requests"] == 2
+
+    prior_day = await client.get(
+        "/api/costs/reports/daily?day=2026-08-10"
+        "&prompt_version=timezone-v1&format=json"
+    )
+    assert prior_day.status_code == 200
+    assert prior_day.json()["days"] == {}
+
+
+@pytest.mark.asyncio
 async def test_budget_lifecycle(client: AsyncClient) -> None:
     # Create
     create_resp = await client.post(
