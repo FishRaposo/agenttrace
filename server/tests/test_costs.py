@@ -317,6 +317,15 @@ async def test_daily_cost_report_buckets_timezone_offsets_by_utc_day(
     assert list(report.json()["days"]) == ["2026-08-11"]
     assert report.json()["days"]["2026-08-11"]["total_requests"] == 2
 
+    csv_report = await client.get(
+        "/api/costs/reports/daily?prompt_version=timezone-v1&format=csv"
+    )
+    assert csv_report.status_code == 200
+    csv_rows = list(csv.DictReader(io.StringIO(csv_report.text)))
+    assert [row["day"] for row in csv_rows] == ["2026-08-11"]
+    assert csv_rows[0]["total_requests"] == "2"
+    assert csv_rows[0]["estimated_cost"] == "0.03"
+
     prior_day = await client.get(
         "/api/costs/reports/daily?day=2026-08-10"
         "&prompt_version=timezone-v1&format=json"
