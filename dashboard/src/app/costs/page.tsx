@@ -26,8 +26,9 @@ import {
   fetchCostProjection,
   fetchBudgets,
   fetchBudgetStatus,
+  fetchDailyCostReport,
 } from "@/lib/api";
-import type { CostSummary, ModelCostBreakdown, Budget, BudgetStatus } from "@/types";
+import type { CostSummary, ModelCostBreakdown, Budget, BudgetStatus, DailyCostReport } from "@/types";
 
 const COLORS = ["#10b981", "#3b82f6", "#f59e0b", "#ef4444", "#8b5cf6", "#06b6d4", "#ec4899"];
 
@@ -61,11 +62,13 @@ export default function CostsPage(): JSX.Element {
   const [budgets, setBudgets] = useState<Budget[]>([]);
   const [budgetStatuses, setBudgetStatuses] = useState<Record<string, BudgetStatus>>({});
   const [loading, setLoading] = useState(true);
+  const [promptVersion, setPromptVersion] = useState("");
+  const [dailyReport, setDailyReport] = useState<DailyCostReport | null>(null);
 
   useEffect(() => {
     async function load() {
       try {
-        const [s, ts, m, p, f, tr, pr, b] = await Promise.all([
+        const [s, ts, m, p, f, tr, pr, b, report] = await Promise.all([
           fetchCostSummary(),
           fetchCostTimeseries("day", 30),
           fetchCostByModel(),
@@ -74,6 +77,7 @@ export default function CostsPage(): JSX.Element {
           fetchTopExpensiveRuns(10),
           fetchCostProjection(),
           fetchBudgets(),
+          fetchDailyCostReport(promptVersion || undefined),
         ]);
         setSummary(s);
         setTimeseries(ts.data);
@@ -83,6 +87,7 @@ export default function CostsPage(): JSX.Element {
         setTopRuns(tr);
         setProjection(pr);
         setBudgets(b);
+        setDailyReport(report);
 
         const statuses: Record<string, BudgetStatus> = {};
         for (const budget of b) {
@@ -103,7 +108,7 @@ export default function CostsPage(): JSX.Element {
 
     const interval = setInterval(load, 10000);
     return () => clearInterval(interval);
-  }, []);
+  }, [promptVersion]);
 
   if (loading) {
     return (
@@ -119,6 +124,36 @@ export default function CostsPage(): JSX.Element {
       <div>
         <h2 className="text-2xl font-bold text-gray-900">Cost & FinOps</h2>
         <p className="text-gray-500 mt-1">Track where your AI spend goes.</p>
+      </div>
+
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div>
+            <h3 className="text-lg font-semibold">Prompt Versions</h3>
+            <p className="text-sm text-gray-500">Compare tagged LLM spend and filter the daily report.</p>
+          </div>
+          <label className="text-sm font-medium text-gray-700">
+            Report filter
+            <select
+              className="ml-3 rounded-md border border-gray-300 bg-white px-3 py-2 text-sm"
+              value={promptVersion}
+              onChange={(event) => setPromptVersion(event.target.value)}
+            >
+              <option value="">All prompt versions</option>
+              {Object.keys(summary?.by_prompt_version ?? {}).sort().map((version) => (
+                <option key={version} value={version}>{version}</option>
+              ))}
+            </select>
+          </label>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-3">
+          {Object.entries(summary?.by_prompt_version ?? {}).sort(([a], [b]) => a.localeCompare(b)).map(([version, cost]) => (
+            <div key={version} className="rounded-md bg-gray-50 p-4 dark:bg-gray-800">
+              <p className="text-sm font-medium text-gray-700 dark:text-gray-200">{version}</p>
+              <p className="mt-1 text-xl font-bold">{formatCost(cost)}</p>
+            </div>
+          ))}
+        </div>
       </div>
 
       {/* KPIs */}
@@ -251,6 +286,42 @@ export default function CostsPage(): JSX.Element {
       </div>
 
       {/* Top expensive runs */}
+      <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
+        <h3 className="text-lg font-semibold mb-4">Daily LLM Cost Report</h3>
+        {Object.keys(dailyReport?.days ?? {}).length === 0 ? (
+          <p className="text-gray-500 text-sm">No LLM traces match this prompt version.</p>
+        ) : (
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr className="border-b border-gray-200 bg-gray-50">
+                  <th className="py-2 px-4 text-left text-xs font-semibold text-gray-500 uppercase">Day</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">Requests</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">Tokens</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">Cost</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">Avg latency</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">p95</th>
+                  <th className="py-2 px-4 text-right text-xs font-semibold text-gray-500 uppercase">Errors</th>
+                </tr>
+              </thead>
+              <tbody>
+                {Object.entries(dailyReport?.days ?? {}).sort(([a], [b]) => b.localeCompare(a)).map(([day, metrics]) => (
+                  <tr key={day} className="border-b border-gray-100">
+                    <td className="py-2 px-4 font-medium">{day}</td>
+                    <td className="py-2 px-4 text-right">{metrics.total_requests.toLocaleString()}</td>
+                    <td className="py-2 px-4 text-right">{metrics.total_tokens.toLocaleString()}</td>
+                    <td className="py-2 px-4 text-right">{formatCost(metrics.estimated_cost)}</td>
+                    <td className="py-2 px-4 text-right">{metrics.average_latency_ms.toFixed(1)} ms</td>
+                    <td className="py-2 px-4 text-right">{metrics.p95_latency_ms.toFixed(1)} ms</td>
+                    <td className="py-2 px-4 text-right">{(metrics.error_rate * 100).toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+
       <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
         <h3 className="text-lg font-semibold mb-4">Top Expensive Runs</h3>
         {topRuns.length === 0 ? (

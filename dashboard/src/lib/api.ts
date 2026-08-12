@@ -15,6 +15,7 @@ import type {
   ModelCostBreakdown,
   Budget,
   BudgetStatus,
+  DailyCostReport,
 } from "@/types";
 import { demoResponseFor } from "@/lib/demoData";
 
@@ -148,8 +149,17 @@ export async function getReplayData(runId: string): Promise<ReplayData> {
 }
 
 // Cost analytics
-export async function fetchCostSummary(): Promise<CostSummary> {
-  return fetchApi<CostSummary>("/api/costs/summary");
+export async function fetchCostSummary(promptVersion?: string): Promise<CostSummary> {
+  const params = new URLSearchParams();
+  if (promptVersion) params.set("prompt_version", promptVersion);
+  const query = params.toString();
+  return fetchApi<CostSummary>(`/api/costs/summary${query ? `?${query}` : ""}`);
+}
+
+export async function fetchDailyCostReport(promptVersion?: string): Promise<DailyCostReport> {
+  const params = new URLSearchParams({ format: "json" });
+  if (promptVersion) params.set("prompt_version", promptVersion);
+  return fetchApi<DailyCostReport>(`/api/costs/reports/daily?${params.toString()}`);
 }
 
 export async function fetchCostTimeseries(

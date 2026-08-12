@@ -154,6 +154,40 @@ export const demoCostSummary: CostSummary = {
   by_provider: { openai: 0.291, anthropic: 0.084 },
   by_model: { "gpt-4o": 0.291, "claude-3-5-sonnet": 0.084 },
   by_feature: { synthesis: 0.21, planning: 0.09, retrieval: 0.075 },
+  by_prompt_version: { "summarize-v1": 0.147, "summarize-v2": 0.228 },
+};
+
+export const demoDailyCostReport = {
+  days: {
+    "2026-08-10": {
+      total_requests: 8,
+      total_tokens: 32600,
+      input_tokens: 20100,
+      output_tokens: 12500,
+      estimated_cost: 0.147,
+      average_latency_ms: 812.5,
+      p50_latency_ms: 760,
+      p95_latency_ms: 1280,
+      p99_latency_ms: 1390,
+      error_rate: 0,
+      cost_by_model: { "gpt-4o": 0.147 },
+      cost_by_prompt_version: { "summarize-v1": 0.147 },
+    },
+    "2026-08-11": {
+      total_requests: 11,
+      total_tokens: 49100,
+      input_tokens: 29200,
+      output_tokens: 19900,
+      estimated_cost: 0.228,
+      average_latency_ms: 745.45,
+      p50_latency_ms: 710,
+      p95_latency_ms: 1190,
+      p99_latency_ms: 1265,
+      error_rate: 0.0909,
+      cost_by_model: { "gpt-4o": 0.144, "claude-3-5-sonnet": 0.084 },
+      cost_by_prompt_version: { "summarize-v2": 0.228 },
+    },
+  },
 };
 
 export const demoCostTimeseries: CostTimeseries = {
@@ -273,6 +307,7 @@ export function demoResponseFor(path: string): unknown {
   if (clean === "/api/stats") return demoStats;
   if (clean === "/health") return demoHealth;
   if (clean === "/api/costs/summary") return demoCostSummary;
+  if (clean === "/api/costs/reports/daily") return demoDailyCostReport;
   if (clean.startsWith("/api/costs/timeseries")) return demoCostTimeseries;
   if (clean === "/api/costs/by-model") return demoCostByModel;
   if (clean === "/api/costs/by-provider") {

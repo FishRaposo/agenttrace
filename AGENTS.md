@@ -14,7 +14,7 @@ agenttrace/
 ├── sdk/                          # installable Python package `agenttrace` — STANDALONE
 │   ├── agenttrace/               #   tracer, span, exporters, instrumentation, wrappers,
 │   │                             #   cost_tracker, hybrid_client, distributed
-│   ├── tests/                    #   84 tests
+│   ├── tests/                    #   standalone SDK test suite
 │   └── pyproject.toml            #   must NOT depend on shared_core (pip-installable on its own)
 ├── server/                       # FastAPI collector — shared_core-backed
 │   ├── app/
@@ -24,8 +24,8 @@ agenttrace/
 │   │   ├── db/__init__.py        #   AsyncDatabaseManager engine + local DeclarativeBase
 │   │   ├── api/                  #   12 routers (traces, runs, stats, costs, budgets, alerts,
 │   │   │                         #     diff, replay, realtime WS, stream SSE, health, auth)
-│   │   ├── models/  services/  auth.py
-│   ├── tests/                    #   26 tests
+│   │   ├── models/  services/  auth.py  # cost_reporting is server-only
+│   ├── tests/                    #   server API/service test suite
 │   ├── migrations/  Dockerfile  pyproject.toml  requirements.txt
 ├── dashboard/                    # Next.js 14 + recharts — KEPT as-is
 ├── examples/run_demo.py          # offline SDK tracing demo (JSONL export)
@@ -54,13 +54,14 @@ availability probes (`# noqa: F401`). The instrumentation modules import `Tracer
 | catch-all 500 handler only | + `shared_core.errors.application_error_handler` + `RequestLoggingMiddleware` (correlation IDs) |
 
 **Preserved domain value:** the entire SDK; the server's replay + run-diff endpoints, WS
-streaming + SSE, `TraceService` run-stat math, JWT auth, cost-attribution columns.
+streaming + SSE, `TraceService` run-stat math, JWT auth, cost-attribution columns,
+prompt-version cost filtering, and deterministic daily JSON/CSV cost reports.
 
 ## Commands
 
 ```bash
 make install      # pip install -e ../shared-core; pip install -e sdk; pip install -e 'server[dev]'; dashboard npm install
-make test         # sdk-test + server-test  -> 84 + 26 passing
+make test         # sdk-test + server-test
 make sdk-test     # standalone SDK tests
 make server-test  # server tests
 make lint         # ruff check server/app sdk/agenttrace examples ...
@@ -75,10 +76,12 @@ Local verification uses `.venv` at the repo root (shared-core editable + SDK edi
 
 ## Current State
 
-**Functional, migrated, green.** Server adopts `shared_core` for config/logging/errors/DB
-and the rate limiter. **84 SDK + 26 server tests pass**; `ruff check`/`format --check`
-clean; `make demo` traces an agent run offline and exports JSONL. The Next.js dashboard is
-unchanged. Default DB is SQLite (`sqlite+aiosqlite`); compose uses Postgres.
+The server adopts `shared_core` for config/logging/errors/DB, rate limiting, and server-side
+LLM metric rollups. Prompt versions remain trace metadata, so the standalone SDK and database
+schema do not gain a new dependency or field. The cost dashboard exposes prompt-version spend
+and daily report filtering. The last pre-port commit recorded 151 passing SDK/server tests; this
+checkout's new focused tests require the development dependencies described under Commands.
+Default DB is SQLite (`sqlite+aiosqlite`); compose uses Postgres.
 
 ## Follow-ups (not done now)
 

@@ -80,8 +80,8 @@ AgentTrace solves this by providing a complete execution trace with rich metadat
 AgentTrace consists of three components:
 
 1. **SDK** (`sdk/`): Python library with decorators (`trace_openai`, `trace_anthropic`, `trace_llm`), hybrid client, and distributed tracing
-2. **Server** (`server/`): FastAPI with cost analytics API, budget tracking, batch ingestion, WebSocket live tail
-3. **Dashboard** (`dashboard/`): Next.js with runs list, cost breakdown, live tail, budget status, waterfall replay
+2. **Server** (`server/`): FastAPI with cost analytics API, prompt-version filtering, deterministic daily JSON/CSV reports, budget tracking, batch ingestion, WebSocket live tail
+3. **Dashboard** (`dashboard/`): Next.js with runs list, prompt-version and daily cost breakdowns, live tail, budget status, waterfall replay
 
 ### Feature Matrix
 
@@ -325,6 +325,8 @@ OpenTelemetry tooling (best-effort, JSON subset):
 | `GET /api/alerts/latency` | Per-span latency-threshold alert |
 | `GET /api/otlp/v1/traces` | Export stored spans as OTLP/JSON `ResourceSpans` |
 | `POST /api/otlp/v1/traces` | Ingest an OTLP/JSON `ExportTraceServiceRequest` |
+| `GET /api/costs/summary?prompt_version=` | Cost totals and breakdowns, optionally filtered by an exact prompt-version metadata tag |
+| `GET /api/costs/reports/daily?day=&prompt_version=&format=json\|csv` | Deterministic UTC daily LLM cost, token, latency, and error rollups |
 
 Inbound cost is taken **verbatim** — adapters normalize the canonical shapes
 into AgentTrace's `TraceCreate` and never recompute pricing, so cost analytics
@@ -427,7 +429,7 @@ This project demonstrates:
 - **Testing**: pytest, pytest-asyncio, 85% coverage gate
 - **Docker**: Multi-container deployment with healthchecks, auto-migrate, auto-seed
 - **Observability**: Span-based tracing, cost tracking, token usage, waterfall timeline
-- **FinOps**: Cost analytics API, budget tracking, burn-rate projection, per-model breakdown
+- **FinOps**: Cost analytics API, budget tracking, burn-rate projection, per-model and per-prompt-version breakdowns, deterministic daily JSON/CSV reports
 - **Multi-agent correlation**: Correlation IDs for distributed workflows
 - **Trace diffing**: Compare runs for regression testing
 - **Prompt replay**: Step-by-step replay for debugging

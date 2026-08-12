@@ -102,6 +102,29 @@ export interface CostSummary {
   by_provider: Record<string, number>;
   by_model: Record<string, number>;
   by_feature: Record<string, number>;
+  by_prompt_version: Record<string, number>;
+}
+
+export interface DailyCostMetrics {
+  total_requests: number;
+  total_tokens: number;
+  input_tokens: number;
+  output_tokens: number;
+  estimated_cost: number;
+  average_latency_ms: number;
+  p50_latency_ms: number;
+  p95_latency_ms: number;
+  p99_latency_ms: number;
+  error_rate: number;
+  cost_by_model: Record<string, number>;
+  cost_by_prompt_version: Record<string, number>;
+}
+
+export interface DailyCostReport {
+  days: Record<string, DailyCostMetrics>;
+  totals?: DailyCostMetrics;
+  day?: string;
+  prompt_version?: string;
 }
 
 export interface CostTimeseries {

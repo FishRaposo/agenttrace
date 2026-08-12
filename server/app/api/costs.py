@@ -4,13 +4,19 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.db import get_session
 from app.models.run import Run
 from app.models.trace import Trace
+from app.services.cost_reporting import (
+    build_daily_report,
+    filter_prompt_version,
+    prompt_version_costs,
+    report_to_csv,
+)
 
 router = APIRouter()
 
@@ -23,9 +29,36 @@ def _token_sum(token_usage: dict | None) -> int:
 
 @router.get("/costs/summary")
 async def get_cost_summary(
+    prompt_version: str | None = Query(
+        None, description="Exact prompt-version tag; use 'unversioned' for missing tags"
+    ),
     session: AsyncSession = Depends(get_session),
 ) -> dict:
     """Return total cost, token, and span counts plus per-dimension breakdowns."""
+    if prompt_version is not None:
+        traces_result = await session.execute(select(Trace))
+        traces = filter_prompt_version(traces_result.scalars().all(), prompt_version)
+        total_cost = sum(trace.cost_usd or 0.0 for trace in traces)
+        total_tokens = sum(_token_sum(trace.token_usage) for trace in traces)
+
+        def cost_by(field: str) -> dict[str, float]:
+            costs: dict[str, float] = {}
+            for trace in traces:
+                value = getattr(trace, field)
+                if value is not None:
+                    costs[value] = costs.get(value, 0.0) + (trace.cost_usd or 0.0)
+            return {key: round(costs[key], 6) for key in sorted(costs)}
+
+        return {
+            "total_cost": round(total_cost, 6),
+            "total_tokens": total_tokens,
+            "total_spans": len(traces),
+            "by_provider": cost_by("provider"),
+            "by_model": cost_by("model"),
+            "by_feature": cost_by("feature"),
+            "by_prompt_version": prompt_version_costs(traces),
+        }
+
     total_cost_result = await session.execute(
         select(func.coalesce(func.sum(Trace.cost_usd), 0.0))
     )
@@ -35,8 +68,9 @@ async def get_cost_summary(
     total_spans_count = total_spans.scalar() or 0
 
     # Compute token totals in Python for SQLite compatibility
-    traces_result = await session.execute(select(Trace.token_usage))
-    total_tokens = sum(_token_sum(row[0]) for row in traces_result.all())
+    traces_result = await session.execute(select(Trace))
+    traces = list(traces_result.scalars().all())
+    total_tokens = sum(_token_sum(trace.token_usage) for trace in traces)
 
     # By provider
     provider_stmt = (
@@ -75,7 +109,37 @@ async def get_cost_summary(
         "by_provider": by_provider,
         "by_model": by_model,
         "by_feature": by_feature,
+        "by_prompt_version": prompt_version_costs(traces),
     }
+
+
+@router.get("/costs/reports/daily", response_model=None)
+async def get_daily_cost_report(
+    day: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Optional UTC day in YYYY-MM-DD format",
+    ),
+    report_format: str = Query("json", alias="format", pattern=r"^(json|csv)$"),
+    prompt_version: str | None = Query(
+        None, description="Exact prompt-version tag; use 'unversioned' for missing tags"
+    ),
+    session: AsyncSession = Depends(get_session),
+) -> dict | Response:
+    """Return deterministic JSON or CSV daily cost and latency rollups."""
+    result = await session.execute(select(Trace).order_by(Trace.start_time, Trace.id))
+    report = build_daily_report(
+        result.scalars().all(), day=day, version=prompt_version
+    )
+    if report_format == "csv":
+        return Response(
+            content=report_to_csv(report),
+            media_type="text/csv",
+            headers={
+                "Content-Disposition": "attachment; filename=daily-cost-report.csv"
+            },
+        )
+    return report
 
 
 @router.get("/costs/timeseries")
