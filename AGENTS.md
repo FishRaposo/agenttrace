@@ -87,7 +87,7 @@ Default DB is SQLite (`sqlite+aiosqlite`); compose uses Postgres.
 
 - Consolidate cost pricing: the server can converge on `shared_core.pricing`, but the SDK's
   `CostTracker.PRICING` must stay SDK-local (the SDK can't import `shared_core`).
-- Let `hermes-agent-framework` emit `shared_core.tracing.Span` objects the collector ingests.
+- Let `aria-agent` (formerly hermes-agent-framework) emit `shared_core.tracing.Span` objects the collector ingests.
 - Server Docker image installs shared-core via its public git URL (workspace packaging gap).
 
 ## When to Update This AGENTS.md
