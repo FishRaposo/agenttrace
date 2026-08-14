@@ -1,5 +1,11 @@
 # Changelog
 
+## 2026-08-14 — browser gate stabilization
+
+- serialized the Playwright workers because the offline demo fixtures and Next
+  development compiler share one process; parallel workers could render the
+  navigated page before its URL state settled.
+
 ## 2026-08-14 — comprehensive portfolio finalization
 
 - made the FastAPI server self-contained with an attributed internal vendor/core
