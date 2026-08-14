@@ -67,9 +67,7 @@ def trace_openai(
             try:
                 result = func(*args, **kwargs)
                 span.output_data = {
-                    "choices_count": len(result.choices)
-                    if hasattr(result, "choices")
-                    else 0
+                    "choices_count": len(getattr(result, "choices", []))
                 }
                 span.end()
 
@@ -104,7 +102,7 @@ def trace_openai(
                         model=detected_model,
                         prompt_tokens=prompt_tokens,
                         completion_tokens=completion_tokens,
-                        latency_ms=span.duration_ms or 0,
+                        latency_ms=int(span.duration_ms or 0),
                         workflow_id=workflow_id,
                         feature=feature,
                     )
@@ -171,9 +169,7 @@ def trace_anthropic(
             try:
                 result = func(*args, **kwargs)
                 span.output_data = {
-                    "content_blocks": len(result.content)
-                    if hasattr(result, "content")
-                    else 0
+                    "content_blocks": len(getattr(result, "content", []))
                 }
                 span.end()
 
@@ -206,7 +202,7 @@ def trace_anthropic(
                         model=detected_model,
                         prompt_tokens=input_tokens,
                         completion_tokens=output_tokens,
-                        latency_ms=span.duration_ms or 0,
+                        latency_ms=int(span.duration_ms or 0),
                         workflow_id=workflow_id,
                         feature=feature,
                     )

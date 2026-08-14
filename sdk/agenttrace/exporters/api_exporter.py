@@ -5,17 +5,13 @@ from __future__ import annotations
 import json
 import logging
 import time
+import urllib.error
+import urllib.request
 from typing import Any
 
-try:
-    import urllib.error
-    import urllib.request
-
-    _HAS_URLLIB = True
-except ImportError:
-    _HAS_URLLIB = False
-
 from agenttrace.exporters.base import BaseExporter
+
+_HAS_URLLIB = True
 
 logger = logging.getLogger(__name__)
 
@@ -67,7 +63,7 @@ class APIExporter(BaseExporter):
             payload["span_id"] = payload.pop("id")
         return payload
 
-    def _send_request(self, url: str, data: dict[str, Any], attempt: int = 0) -> bool:
+    def _send_request(self, url: str, data: Any, attempt: int = 0) -> bool:
         """Send an HTTP POST request with retry logic.
 
         Args:

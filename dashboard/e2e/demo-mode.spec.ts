@@ -19,7 +19,7 @@ test.describe("AgentTrace demo mode (offline)", () => {
   });
 
   test("dashboard shows the demo banner and sample stats", async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
     await expect(page.getByTestId("demo-mode-banner")).toBeVisible({
       timeout: 10000,
     });
@@ -29,7 +29,7 @@ test.describe("AgentTrace demo mode (offline)", () => {
   });
 
   test("runs page is explorable with sample data", async ({ page }) => {
-    await page.goto("http://localhost:3000/runs");
+    await page.goto("/runs");
     await expect(page.getByTestId("demo-mode-banner")).toBeVisible({
       timeout: 10000,
     });
@@ -37,10 +37,10 @@ test.describe("AgentTrace demo mode (offline)", () => {
   });
 
   test("costs page renders analytics from demo fixtures", async ({ page }) => {
-    await page.goto("http://localhost:3000/costs");
+    await page.goto("/costs");
     await expect(page.getByTestId("demo-mode-banner")).toBeVisible({
       timeout: 10000,
     });
-    await expect(page.locator("h2")).toContainText("Cost Analytics");
+    await expect(page.locator("h2")).toContainText("Cost & FinOps");
   });
 });

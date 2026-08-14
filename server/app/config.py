@@ -2,15 +2,16 @@
 
 from __future__ import annotations
 
-from pydantic import field_validator
-from shared_core.config import BaseAppConfig
+from pydantic import Field, field_validator
+
+from app.internal.vendor_core.config import BaseAppConfig
 
 
 class Settings(BaseAppConfig):
-    """Application settings, extending the shared_core base configuration.
+    """Application settings, extending the pinned internal base configuration.
 
     Inherits infrastructure fields (REDIS_URL, LOG_LEVEL, DB_POOL_*, ...) from
-    ``shared_core.config.BaseAppConfig`` and adds AgentTrace's domain fields.
+    the internally vendored compatibility base and adds AgentTrace's domain fields.
     """
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/agenttrace.db"
@@ -22,6 +23,12 @@ class Settings(BaseAppConfig):
     CORS_ORIGINS: list[str] = ["*"]
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ENVIRONMENT: str = "development"
+    AUTH_REQUIRED: bool = False
+    REALTIME_BACKEND: str = "memory"
+    TRACE_SAMPLING_MODE: str = "off"
+    TRACE_SAMPLE_RATE: float = Field(default=1.0, ge=0.0, le=1.0)
+    TRACE_TAIL_SLOW_MS: float | None = Field(default=None, ge=0.0)
+    TRACE_TAIL_KEEP_ERRORS: bool = True
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod

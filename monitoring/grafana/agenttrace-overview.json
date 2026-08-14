@@ -1,0 +1,41 @@
+{
+  "title": "AgentTrace overview",
+  "schemaVersion": 39,
+  "version": 1,
+  "timezone": "browser",
+  "tags": ["agenttrace", "observability", "cost"],
+  "templating": {"list": []},
+  "time": {"from": "now-6h", "to": "now"},
+  "panels": [
+    {
+      "id": 1,
+      "type": "timeseries",
+      "title": "Trace throughput",
+      "targets": [{"expr": "agenttrace_traces_total", "refId": "A"}]
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Latency p95",
+      "targets": [{"expr": "agenttrace_latency_p95_ms", "refId": "A"}]
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Estimated cost",
+      "targets": [{"expr": "agenttrace_cost_usd_total", "refId": "A"}]
+    },
+    {
+      "id": 4,
+      "type": "stat",
+      "title": "Error rate",
+      "targets": [{"expr": "agenttrace_error_rate", "refId": "A"}]
+    },
+    {
+      "id": 5,
+      "type": "stat",
+      "title": "Sampled traces",
+      "targets": [{"expr": "agenttrace_sampled_traces_total", "refId": "A"}]
+    }
+  ]
+}

@@ -1,8 +1,7 @@
-"""Ingestion adapters — convert shared_core trace primitives into AgentTrace records.
+"""Ingestion adapters — convert canonical trace primitives into AgentTrace records.
 
-The collector accepts spans emitted by any service built on the ``shared_core``
-standard (for example ``hermes-agent-framework`` via ``shared_core.tracing.Span``)
-and LCM-style cost records (``shared_core.tracing.CostRecord``). These adapters
+The collector accepts spans emitted by any compatible producer and cost records
+using the canonical trace contract. These adapters
 normalize the canonical shapes into the server's :class:`~app.models.trace.TraceCreate`
 schema so they flow through the same ``TraceService`` ingestion path as native SDK
 spans, with no change to the stored representation.
@@ -14,7 +13,7 @@ Design goals:
 * **No new numeric behavior** — cost is taken verbatim from the inbound record;
   the adapters never recompute pricing, so existing golden cost outputs are
   untouched.
-* **Stable span vocabulary** — the canonical ``shared_core`` span types/statuses
+* **Stable span vocabulary** — canonical span types/statuses
   are mapped onto AgentTrace's existing vocabulary so the dashboard and analytics
   continue to work unchanged.
 """
@@ -22,13 +21,13 @@ Design goals:
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
-from typing import Any, Optional
+from typing import Any
 
-from pydantic import BaseModel, Field
-
+from app.internal.compat import normalize_cost_record, normalize_span
+from app.internal.contracts import CanonicalCostRecord, CanonicalSpan
 from app.models.trace import TraceCreate
 
-# shared_core.tracing.SpanType -> AgentTrace span_type vocabulary.
+# Canonical span type -> AgentTrace span_type vocabulary.
 _SPAN_TYPE_MAP: dict[str, str] = {
     "llm": "llm_call",
     "tool": "tool_call",
@@ -37,7 +36,7 @@ _SPAN_TYPE_MAP: dict[str, str] = {
     "other": "custom",
 }
 
-# shared_core.tracing.SpanStatus -> AgentTrace span status vocabulary.
+# Canonical span status -> AgentTrace span status vocabulary.
 _SPAN_STATUS_MAP: dict[str, str] = {
     "ok": "completed",
     "error": "error",
@@ -71,26 +70,15 @@ def map_span_status(status: str) -> str:
     return _SPAN_STATUS_MAP.get(status, status)
 
 
-class SharedSpanIngest(BaseModel):
-    """Inbound transport shape for a ``shared_core.tracing.Span``/``TraceSpan``.
+SharedSpanIngest = CanonicalSpan
+CostRecordIngest = CanonicalCostRecord
 
-    Accepts the exact JSON produced by ``Span.to_dict()`` /
-    ``TraceSpan.model_dump()`` as emitted by ``hermes-agent-framework`` and any
-    other ``shared_core``-based producer. ``start_ms``/``end_ms`` are wall-clock
-    milliseconds; ``trace_id`` becomes the AgentTrace ``run_id``.
+
+class _LegacySpanDoc:
+    """Documentation marker for the retained ``SharedSpanIngest`` alias.
+
+    The alias accepts the exact JSON produced by canonical producer objects.
     """
-
-    trace_id: str = Field(..., description="Canonical trace id (maps to run_id)")
-    span_id: str = Field(..., description="Unique span identifier")
-    parent_span_id: Optional[str] = Field(None, description="Parent span id")
-    name: str = Field(..., description="Span name")
-    span_type: str = Field("other", description="shared_core span type")
-    status: str = Field("ok", description="shared_core span status")
-    start_ms: float = Field(0.0, description="Start time in epoch milliseconds")
-    end_ms: Optional[float] = Field(None, description="End time in epoch milliseconds")
-    attributes: dict[str, Any] = Field(
-        default_factory=dict, description="Arbitrary span attributes"
-    )
 
 
 def _ms_to_datetime(value: float) -> datetime:
@@ -98,11 +86,11 @@ def _ms_to_datetime(value: float) -> datetime:
     return datetime.fromtimestamp(value / 1000.0, tz=timezone.utc)
 
 
-def span_to_trace_create(span: SharedSpanIngest) -> TraceCreate:
-    """Convert a canonical shared_core span into a :class:`TraceCreate`.
+def span_to_trace_create(span: SharedSpanIngest | Any) -> TraceCreate:
+    """Convert a canonical span into a :class:`TraceCreate`.
 
     Cost, token usage, model, provider and feature are lifted out of the span
-    ``attributes`` bag when present (the convention used by ``shared_core``
+    ``attributes`` bag when present (the convention used by canonical
     producers), and otherwise left ``None``. No cost is computed here.
 
     Args:
@@ -111,6 +99,7 @@ def span_to_trace_create(span: SharedSpanIngest) -> TraceCreate:
     Returns:
         A ``TraceCreate`` ready for ``TraceService.ingest_trace``.
     """
+    span = normalize_span(span)
     attrs = dict(span.attributes or {})
 
     cost_usd = attrs.pop("cost_usd", None)
@@ -159,32 +148,21 @@ def span_to_trace_create(span: SharedSpanIngest) -> TraceCreate:
         model=model,
         provider=provider,
         feature=feature,
+        sampled=True,
+        sampling_reason=None,
     )
 
 
-class CostRecordIngest(BaseModel):
-    """Inbound transport shape for a ``shared_core.tracing.CostRecord``.
+class _LegacyCostDoc:
+    """Documentation marker for the retained ``CostRecordIngest`` alias.
 
-    Mirrors the LCM-style cost record emitted by ``shared_core``-based services.
-    A cost record is materialized as a single ``llm_call`` span so it shows up in
-    the same cost-attribution analytics as native traces.
+    A cost record is materialized as a single ``llm_call`` span so it shows up
+    in the same cost-attribution analytics as native traces.
     """
 
-    trace_id: Optional[str] = Field(None, description="Associated trace/run id")
-    span_id: Optional[str] = Field(None, description="Optional span id")
-    model: str = Field(..., description="Model name")
-    provider: Optional[str] = Field(None, description="Provider name")
-    prompt_tokens: int = Field(0, description="Prompt token count")
-    completion_tokens: int = Field(0, description="Completion token count")
-    total_tokens: int = Field(0, description="Total token count")
-    estimated_cost: float = Field(0.0, description="Estimated cost in USD")
-    latency_ms: float = Field(0.0, description="Operation latency in milliseconds")
-    name: Optional[str] = Field(None, description="Optional span name override")
-    feature: Optional[str] = Field(None, description="Optional feature attribution")
 
-
-def cost_record_to_trace_create(record: CostRecordIngest) -> TraceCreate:
-    """Convert an LCM-style cost record into a :class:`TraceCreate`.
+def cost_record_to_trace_create(record: CostRecordIngest | Any) -> TraceCreate:
+    """Convert a canonical cost record into a :class:`TraceCreate`.
 
     The record becomes an ``llm_call`` span carrying the verbatim ``estimated_cost``
     and token usage. ``total_tokens`` falls back to ``prompt + completion`` when not
@@ -198,7 +176,8 @@ def cost_record_to_trace_create(record: CostRecordIngest) -> TraceCreate:
     """
     import uuid
 
-    total = record.total_tokens or (record.prompt_tokens + record.completion_tokens)
+    record = normalize_cost_record(record)
+    total = record.resolved_total_tokens()
     end_time = datetime.now(timezone.utc)
     start_time = end_time - timedelta(milliseconds=record.latency_ms)
 
@@ -225,4 +204,6 @@ def cost_record_to_trace_create(record: CostRecordIngest) -> TraceCreate:
         model=record.model,
         provider=record.provider,
         feature=record.feature,
+        sampled=True,
+        sampling_reason=None,
     )

@@ -11,6 +11,7 @@ from sqlalchemy import DateTime, String
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
+from app.internal.rbac import Role
 
 
 class User(Base):
@@ -23,6 +24,9 @@ class User(Base):
     )
     username: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
+    role: Mapped[str] = mapped_column(
+        String(20), nullable=False, default=Role.VIEWER.value
+    )
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, default=lambda: datetime.now(timezone.utc)
     )
@@ -40,6 +44,7 @@ class UserResponse(BaseModel):
 
     id: str
     username: str
+    role: Role = Role.VIEWER
     created_at: Optional[datetime] = None
 
     model_config = {"from_attributes": True}

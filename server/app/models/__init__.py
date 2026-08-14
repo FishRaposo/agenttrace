@@ -1,5 +1,13 @@
 """Models package — SQLAlchemy models and Pydantic schemas."""
 
+from app.models.alert import (
+    AlertEvent,
+    AlertEventResponse,
+    AlertRule,
+    AlertRuleCreate,
+    AlertRuleResponse,
+)
+from app.models.audit import AuditLog, AuditLogResponse
 from app.models.budget import Budget, BudgetCreate, BudgetResponse, BudgetStatusResponse
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
@@ -10,6 +18,13 @@ __all__ = [
     "BudgetCreate",
     "BudgetResponse",
     "BudgetStatusResponse",
+    "AlertRule",
+    "AlertRuleCreate",
+    "AlertRuleResponse",
+    "AlertEvent",
+    "AlertEventResponse",
+    "AuditLog",
+    "AuditLogResponse",
     "Run",
     "RunCreate",
     "RunResponse",

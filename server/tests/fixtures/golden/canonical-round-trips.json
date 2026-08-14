@@ -1,0 +1,24 @@
+{
+  "span": {
+    "trace_id": "golden-trace",
+    "span_id": "golden-span",
+    "parent_span_id": null,
+    "name": "lookup",
+    "span_type": "tool",
+    "status": "ok",
+    "start_ms": 10.0,
+    "end_ms": 25.0,
+    "attributes": {"query": "agenttrace"}
+  },
+  "cost_record": {
+    "trace_id": "golden-trace",
+    "span_id": null,
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "prompt_tokens": 10,
+    "completion_tokens": 5,
+    "total_tokens": 15,
+    "estimated_cost": 0.001,
+    "latency_ms": 42.0
+  }
+}

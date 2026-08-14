@@ -2,20 +2,19 @@ PYTHON := python
 NPM    := npm
 
 .PHONY: install dev test sdk-test server-test dashboard-test lint format typecheck \
-        docker-up docker-down demo clean help
+        evidence forbidden-scan package docker-up docker-down demo clean help
 
-install: ## Install shared-core, the SDK (standalone), server, and dashboard deps
-	pip install -e ../shared-core
-	pip install -e sdk
-	pip install -e "server[dev]"
-	cd dashboard && $(NPM) install
+install: ## Install the SDK, self-contained server, and dashboard deps
+	$(PYTHON) -m pip install -e "sdk[dev]"
+	$(PYTHON) -m pip install -e "server[dev]"
+	cd dashboard && $(NPM) ci
 
 dev: ## Run the collector server locally (uvicorn on :8000)
 	cd server && uvicorn app.main:app --reload --port 8000
 
 test: sdk-test server-test ## Run SDK + server test suites
 
-sdk-test: ## Run SDK tests (standalone — no shared-core)
+sdk-test: ## Run SDK tests (standalone)
 	cd sdk && $(PYTHON) -m pytest -q
 
 server-test: ## Run server tests
@@ -31,7 +30,20 @@ format: ## Format Python code with ruff
 	ruff format server/app sdk/agenttrace examples server/tests sdk/tests
 
 typecheck: ## Type-check server + SDK with pyright
-	pyright server/app sdk/agenttrace
+	$(PYTHON) -m pyright server/app sdk/agenttrace
+
+evidence: ## Run the deterministic offline portfolio evidence demo
+	$(PYTHON) scripts/portfolio_demo.py
+	$(PYTHON) scripts/verify_portfolio_evidence.py
+
+forbidden-scan: ## Ensure no external shared-core dependency remains actionable
+	$(PYTHON) scripts/check_forbidden_dependencies.py
+
+package: ## Build SDK and server wheels
+	$(PYTHON) -m pip install build
+	$(PYTHON) -m build sdk
+	$(PYTHON) -m build server
+	$(PYTHON) scripts/check_wheel_contents.py
 
 docker-up: ## Start Postgres + Redis + server + dashboard
 	docker compose up -d

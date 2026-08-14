@@ -1,0 +1,11 @@
+{
+  "rules": [
+    {"kind": "run_cost", "threshold": 1.0, "enabled": true},
+    {"kind": "latency", "threshold": 500.0, "enabled": true}
+  ],
+  "transitions": [
+    {"state": "open", "dedup_key": "run_cost:golden-run"},
+    {"state": "acknowledged", "dedup_key": "run_cost:golden-run"},
+    {"state": "resolved", "dedup_key": "run_cost:golden-run"}
+  ]
+}

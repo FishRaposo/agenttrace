@@ -1,6 +1,6 @@
 # AgentTrace Deployment Guide
 
-## Quick Start — Docker Compose (Recommended)
+## Quick start — Docker Compose (optional integration)
 
 ```bash
 cp .env.example .env
@@ -12,7 +12,9 @@ This starts:
 - **AgentTrace Server** (FastAPI on port 8000)
 - **AgentTrace Dashboard** (Next.js on port 3000)
 
-The server auto-migrates the database on first boot and seeds demo data if the database is empty.
+The server creates or migrates the database on first boot and seeds demo data if
+the database is empty. Docker/PostgreSQL are optional; `make install` plus
+SQLite is the canonical offline path.
 
 ## Environment Variables
 
@@ -27,12 +29,18 @@ The server auto-migrates the database on first boot and seeds demo data if the d
 | `ANTHROPIC_API_KEY` | — | Required only for `AGENTTRACE_LLM_MODE=real` |
 | `AGENTTRACE_LLM_MODE` | `sim` | `sim` (mock) or `real` (live API calls) |
 | `AGENTTRACE_LLM_SEED` | `42` | Deterministic seed for simulated responses |
+| `AUTH_REQUIRED` | `false` | Require JWT for protected writes/admin routes |
+| `REALTIME_BACKEND` | `memory` | `memory` or optional `redis` |
+| `TRACE_SAMPLING_MODE` | `off` | `off`, `head`, or `tail` |
+| `TRACE_SAMPLE_RATE` | `1.0` | Stable SHA-256 retention rate |
+| `TRACE_TAIL_SLOW_MS` | unset | Tail-sampling slow-span override |
+| `TRACE_TAIL_KEEP_ERRORS` | `true` | Retain terminal errors in tail mode |
 
 ## Production Checklist
 
-1. **Database**: Switch from SQLite to Postgres. Set `DATABASE_TYPE=postgres` and `DATABASE_URL=postgresql+asyncpg://...`.
+1. **Database**: Switch from SQLite to Postgres when durable multi-process storage is needed. Set `DATABASE_TYPE=postgres` and `DATABASE_URL=postgresql+asyncpg://...`.
 2. **Secrets**: Use a secrets manager (e.g. AWS Secrets Manager, 1Password) for `OPENAI_API_KEY` and `ANTHROPIC_API_KEY`. Never commit them.
-3. **SSL**: Put the server behind a reverse proxy (Nginx, Traefik, Caddy) with TLS termination.
+3. **Auth/SSL**: Set `AUTH_REQUIRED=true`, replace the seeded password, and put the server behind a reverse proxy (Nginx, Traefik, Caddy) with TLS termination.
 4. **Backup**: Schedule daily `pg_dump` backups for Postgres.
 5. **Monitoring**: The server exposes a `/health` endpoint for load-balancer health checks.
 
@@ -49,7 +57,7 @@ The server auto-migrates the database on first boot and seeds demo data if the d
 cd server
 python -m venv .venv
 source .venv/bin/activate
-pip install -r requirements.txt
+pip install -e ".[dev]"
 python -c "import asyncio; from app.db import init_db; asyncio.run(init_db())"
 uvicorn app.main:app --host 0.0.0.0 --port 8000
 ```
@@ -58,7 +66,7 @@ uvicorn app.main:app --host 0.0.0.0 --port 8000
 
 ```bash
 cd dashboard
-npm install
+npm ci
 npm run build
 npm start
 ```

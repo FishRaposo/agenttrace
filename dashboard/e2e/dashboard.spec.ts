@@ -2,13 +2,15 @@ import { test, expect } from "@playwright/test";
 
 test.describe("AgentTrace Dashboard E2E Tests", () => {
   test.beforeEach(async ({ page }) => {
-    await page.goto("http://localhost:3000");
+    await page.goto("/");
   });
 
   test("homepage loads and displays stats", async ({ page }) => {
-    await expect(page.locator("h1")).toContainText("AgentTrace");
+    await expect(page.getByRole("heading", { name: "AgentTrace", exact: true })).toBeVisible();
     await expect(page.locator("text=Agent Observability")).toBeVisible();
-    await expect(page.locator("h2")).toContainText("Dashboard");
+    await expect(
+      page.getByRole("heading", { name: "Operation Volume Trajectory" })
+    ).toBeVisible();
     await expect(page.locator("text=Total Runs")).toBeVisible();
   });
 
@@ -55,7 +57,7 @@ test.describe("AgentTrace Dashboard E2E Tests", () => {
   test("costs page loads with analytics", async ({ page }) => {
     await page.click("text=Costs");
     await expect(page).toHaveURL(/\/costs/);
-    await expect(page.locator("h2")).toContainText("Cost Analytics");
+    await expect(page.locator("h2")).toContainText("Cost & FinOps");
     // Budget bars or charts should be present
     const chart = page.locator("[data-testid='cost-chart'], canvas, svg").first();
     await expect(chart).toBeVisible({ timeout: 5000 });
@@ -65,11 +67,8 @@ test.describe("AgentTrace Dashboard E2E Tests", () => {
     await page.click("text=Live");
     await expect(page).toHaveURL(/\/live/);
     await expect(page.locator("h2")).toContainText("Live Tail");
-    await expect(page.locator("text=Connecting")).toBeVisible();
-    // After a short delay, connection status should update
-    await page.waitForTimeout(1000);
-    const status = page.locator("text=/Connected|Waiting for traces/");
-    await expect(status).toBeVisible({ timeout: 5000 });
+    await expect(page.locator("text=Waiting for spans..."))
+      .toBeVisible({ timeout: 5000 });
   });
 
   test("run detail page shows timeline and diff", async ({ page }) => {

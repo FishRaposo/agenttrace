@@ -1,38 +1,41 @@
-# AgentTrace Architecture
+# AgentTrace architecture
 
-## Overview
+AgentTrace is a three-part, offline-first observability system:
 
-AgentTrace provides OpenTelemetry-compatible tracing with FinOps capabilities for AI agent systems.
-
-## Components
-
-```
-┌──────────────┐     ┌──────────────┐     ┌──────────────┐
-│  Python SDK  │────▶│  FastAPI     │────▶│  SQLite/PG   │
-│  (agenttrace)│     │  Server      │     │  (trace db)  │
-└──────────────┘     └──────────────┘     └──────────────┘
-        │                   │
-        ▼                   ▼
-┌──────────────┐     ┌──────────────┐
-│  OTLP Export │     │  Next.js     │
-│  (optional)  │     │  Dashboard   │
-└──────────────┘     └──────────────┘
+```text
+SDK (standalone) -> FastAPI collector -> SQLite by default / PostgreSQL optional
+       |                    |                    |
+       +--> JSONL/API       +--> replay/diff      +--> Next.js dashboard
+                            +--> OTLP HTTP/JSON
+                            +--> in-memory/Redis realtime
+                            +--> alerts, RBAC, audit, evidence
 ```
 
-## Span Model
+## Boundaries
 
-- **run_id** — UUID for a complete agent run
-- **span_id** — UUID for an operation within a run
-- **parent_span_id** — Hierarchical relationship
-- **span_type** — `llm_call`, `tool_call`, `decision`, `retrieval`, `custom`
-- **metadata** — Key-value metadata including model, provider, feature
-- **cost_usd** — Cost attribution per span
-- **token_usage** — Prompt/completion/total tokens
+The SDK records runs and spans without importing the server. The server owns
+canonical compatibility contracts and a pinned vendored infrastructure subset
+under `server/app/internal/`. The dashboard reads the stable API and has a
+visibly labeled fixture-backed demo path when the API is offline.
 
-## Observability
+## Span model
 
-- Health check at `/health`
-- Cost analytics API at `/api/costs/*`
-- Budget tracking at `/api/budgets`
-- Live SSE tail at `/api/stream`
-- Trace diffing for regression detection
+- `run_id` identifies a complete agent execution;
+- `span_id` and `parent_span_id` form the operation tree;
+- `span_type` covers LLM, tool, decision, retrieval, and custom work;
+- metadata includes model/provider/feature, OTLP resource/scope data, and
+  provider usage where available;
+- `cost_usd`, token usage, duration, status, and additive sampling metadata
+  support FinOps and retention analysis.
+
+## Operational layers
+
+- **Sampling:** stable SHA-256 head decisions and buffered tail decisions;
+- **Realtime:** in-memory publication by default, optional Redis adapter behind
+  existing WebSocket/SSE routes;
+- **Alerts:** persisted local cost/latency rules and deduplicated state;
+- **Access:** single-tenant admin/ingestor/viewer roles and redacted audit log;
+- **Evidence:** canonical report, manifest, Markdown explanation, and checksums.
+
+OTLP protobuf/gRPC, hosted/team workflows, hosted scheduling, external
+notification services, and mandatory infrastructure dependencies remain deferred.

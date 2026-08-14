@@ -1,0 +1,10 @@
+{
+  "roles": {
+    "viewer": ["traces:read", "runs:read", "alerts:read", "replay:read"],
+    "ingestor": ["traces:read", "runs:read", "alerts:read", "replay:read", "traces:write", "runs:write"],
+    "admin": ["traces:read", "runs:read", "alerts:read", "replay:read", "traces:write", "runs:write", "users:admin", "alerts:admin", "audit:read"]
+  },
+  "auth_required_default": false,
+  "redacted_password": "[REDACTED]",
+  "invalid_token_status": 401
+}

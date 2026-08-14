@@ -16,8 +16,11 @@ from app.auth import (
     get_password_hash,
     verify_password,
 )
+from app.config import settings
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.user import User as UserDB
+from app.services.audit import record_audit
 
 router = APIRouter()
 
@@ -31,6 +34,7 @@ class User(BaseModel):
     """User model for authentication."""
 
     username: str
+    role: Role = Role.VIEWER
 
 
 class Token(BaseModel):
@@ -75,16 +79,21 @@ async def get_current_user(
     if payload is None:
         raise credentials_exception
 
-    username: str = payload.get("sub")
-    if username is None:
+    username_value = payload.get("sub")
+    if not isinstance(username_value, str):
         raise credentials_exception
+    username = username_value
 
     result = await session.execute(select(UserDB).where(UserDB.username == username))
     user = result.scalar_one_or_none()
     if user is None:
         raise credentials_exception
 
-    return User(username=user.username)
+    try:
+        role = Role(user.role)
+    except ValueError:
+        role = Role.VIEWER
+    return User(username=user.username, role=role)
 
 
 async def get_optional_user(
@@ -108,6 +117,40 @@ async def get_optional_user(
         return await get_current_user(token=token, session=session)
     except HTTPException:
         return None
+
+
+def require_roles(*roles: Role):
+    """Build a dependency for a role-gated endpoint.
+
+    Development/offline mode uses a synthetic admin identity so the portfolio
+    demo remains credential-free. Production mode must set ``AUTH_REQUIRED``.
+    """
+
+    async def dependency(
+        current_user: User | None = Depends(get_optional_user),
+        raw_token: str | None = Depends(optional_oauth2_scheme),
+    ) -> User:
+        if current_user is None:
+            if settings.AUTH_REQUIRED or raw_token is not None:
+                raise HTTPException(
+                    status_code=status.HTTP_401_UNAUTHORIZED,
+                    detail="Authentication required",
+                    headers={"WWW-Authenticate": "Bearer"},
+                )
+            return User(username="offline", role=Role.ADMIN)
+        viewer_access = Role.VIEWER in roles and current_user.role == Role.INGESTOR
+        if (
+            roles
+            and current_user.role not in roles
+            and current_user.role != Role.ADMIN
+            and not viewer_access
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, detail="Forbidden"
+            )
+        return current_user
+
+    return dependency
 
 
 @router.post("/auth/register", response_model=User, status_code=201)
@@ -137,11 +180,22 @@ async def register(
         )
 
     hashed_password = get_password_hash(user_data.password)
-    user = UserDB(username=user_data.username, hashed_password=hashed_password)
+    user = UserDB(
+        username=user_data.username,
+        hashed_password=hashed_password,
+        role=Role.VIEWER.value,
+    )
     session.add(user)
     await session.flush()
+    await record_audit(
+        session,
+        actor=user.username,
+        action="user.register",
+        resource=f"user:{user.username}",
+        details={"password": user_data.password},
+    )
 
-    return User(username=user.username)
+    return User(username=user.username, role=Role(user.role))
 
 
 @router.post("/auth/token", response_model=Token)
@@ -174,7 +228,14 @@ async def login(
 
     access_token_expires = timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
     access_token = create_access_token(
-        data={"sub": user.username}, expires_delta=access_token_expires
+        data={"sub": user.username, "role": user.role},
+        expires_delta=access_token_expires,
+    )
+    await record_audit(
+        session,
+        actor=user.username,
+        action="user.login",
+        resource=f"user:{user.username}",
     )
 
     return Token(access_token=access_token, token_type="bearer")

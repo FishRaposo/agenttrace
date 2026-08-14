@@ -1,0 +1,14 @@
+{
+  "provider": "openai",
+  "model": "gpt-4o",
+  "prompt_tokens": 1000,
+  "completion_tokens": 1000,
+  "cost_usd": 0.02,
+  "workflow": {
+    "workflow_id": "golden-workflow",
+    "total_cost": 0.02,
+    "total_tokens": 2000,
+    "request_count": 1,
+    "average_latency_ms": 120
+  }
+}

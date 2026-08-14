@@ -49,11 +49,11 @@ Next.js + Tailwind + Recharts application:
 ### First-Time Setup
 
 ```bash
-# Install all dependencies
+# Install all declared dependencies
 make install
 
-# Run database migrations
-make setup
+# Run the offline evidence contract
+make evidence
 
 # Start the development server
 make dev
@@ -75,7 +75,7 @@ alembic upgrade head
 
 # Dashboard
 cd dashboard
-npm install
+npm ci
 ```
 
 ---
@@ -190,7 +190,7 @@ This runs SDK and server tests. Dashboard E2E tests run separately with `make da
 
 ## PR Process
 
-1. **Fork the repository** and create a feature branch from `master`.
+1. **Fork the repository** and create a feature branch from `main`.
 2. **Make changes** following existing code conventions (see `.editorconfig`).
 3. **Write tests** for new functionality.
 4. **Run linting and type checking**:
@@ -212,7 +212,7 @@ This runs SDK and server tests. Dashboard E2E tests run separately with `make da
    ```
 
 7. **Commit with a descriptive message** following conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).
-8. **Open a PR** against `master`. CI will run automatically via GitHub Actions.
+8. **Open a PR** against `main`. CI will run automatically via GitHub Actions.
 9. **Address review feedback** and ensure CI passes before merging.
 
 ### Pre-commit Hooks

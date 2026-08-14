@@ -193,7 +193,7 @@ def trace_llm(  # noqa: C901
                         model=model,
                         prompt_tokens=usage["prompt_tokens"],
                         completion_tokens=usage["completion_tokens"],
-                        latency_ms=span.duration_ms or 0,
+                        latency_ms=int(span.duration_ms or 0),
                         workflow_id=workflow_id,
                         feature=feature,
                     )

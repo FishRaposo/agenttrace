@@ -8,11 +8,13 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.run import Run
 from app.models.trace import Trace
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 @router.get("/diff/runs")

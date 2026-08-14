@@ -3,12 +3,10 @@ FROM python:3.12-slim
 WORKDIR /app
 
 COPY requirements.txt .
-# shared-core is the workspace's shared library (installed from its public git repo).
-RUN pip install --no-cache-dir \
-    "git+https://github.com/FishRaposo/operator-shared-core.git" \
-    && pip install --no-cache-dir -r requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
+RUN pip install --no-cache-dir .
 
 # Make entrypoint executable
 RUN chmod +x docker-entrypoint.sh

@@ -4,11 +4,9 @@ Exposes stored AgentTrace spans in the OTLP/JSON ``ResourceSpans`` shape so the
 collector can be scraped by OpenTelemetry-aware tooling, and accepts an OTLP/JSON
 ``ExportTraceServiceRequest`` push so OTel SDKs can forward spans into AgentTrace.
 
-This is intentionally a *best-effort* subset of the OTLP spec (no protobuf, no
-gRPC, nanosecond timestamps as numeric strings, a flat single-scope layout). It
-preserves AgentTrace cost/token attribution as OTLP span attributes, and maps
-inbound OTLP spans back onto the native ingestion path without recomputing any
-numeric values.
+This is an offline-compatible JSON implementation of the OTLP HTTP shape. It
+preserves resources, instrumentation scopes, events, links, status, and
+AgentTrace cost/token attribution while keeping protobuf and gRPC out of scope.
 """
 
 from __future__ import annotations
@@ -21,12 +19,15 @@ from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import User, get_optional_user
+from app.api.auth import User, require_roles
+from app.config import settings
 from app.db import get_session
+from app.internal.rbac import Role
+from app.internal.sampling import SamplingPolicy
 from app.models.trace import Trace, TraceCreate
 from app.services.trace_service import TraceService
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 # OTLP status_code enum: 0=UNSET, 1=OK, 2=ERROR.
 _OTLP_STATUS = {
@@ -60,7 +61,7 @@ def _attr(key: str, value: Any) -> dict[str, Any]:
     return {"key": key, "value": {"stringValue": str(value)}}
 
 
-def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:
+def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:  # noqa: C901
     """Render a stored ``Trace`` as an OTLP/JSON span object."""
     attributes: list[dict[str, Any]] = [_attr("agenttrace.span_type", trace.span_type)]
     if trace.cost_usd is not None:
@@ -75,6 +76,11 @@ def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:
         for k, v in trace.token_usage.items():
             if isinstance(v, int):
                 attributes.append(_attr(f"llm.usage.{k}", v))
+    attributes.append(_attr("agenttrace.sampled", trace.sampled))
+
+    metadata = trace.trace_metadata or {}
+    events = metadata.get("otlp.events")
+    links = metadata.get("otlp.links")
 
     span: dict[str, Any] = {
         "traceId": trace.run_id,
@@ -86,6 +92,12 @@ def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:
         "attributes": attributes,
         "status": {"code": _OTLP_STATUS.get(trace.status, 0)},
     }
+    if events:
+        span["events"] = events
+    if links:
+        span["links"] = links
+    if metadata.get("otlp.trace_state"):
+        span["traceState"] = metadata["otlp.trace_state"]
     if trace.parent_span_id:
         span["parentSpanId"] = trace.parent_span_id
     if trace.error:
@@ -119,14 +131,13 @@ async def export_otlp_traces(
     return {
         "resourceSpans": [
             {
-                "resource": {
-                    "attributes": [
-                        _attr("service.name", "agenttrace"),
-                    ]
-                },
+                "resource": {"attributes": [_attr("service.name", "agenttrace")]},
                 "scopeSpans": [
                     {
-                        "scope": {"name": "agenttrace.collector", "version": "0.1.0"},
+                        "scope": {
+                            "name": "agenttrace.collector",
+                            "version": "0.1.0",
+                        },
                         "spans": [_trace_to_otlp_span(t) for t in traces],
                     }
                 ],
@@ -153,18 +164,23 @@ class OTLPSpan(BaseModel):
     startTimeUnixNano: Optional[str] = None
     endTimeUnixNano: Optional[str] = None
     attributes: list[OTLPKeyValue] = Field(default_factory=list)
+    traceState: Optional[str] = None
+    events: list[dict[str, Any]] = Field(default_factory=list)
+    links: list[dict[str, Any]] = Field(default_factory=list)
     status: dict[str, Any] = Field(default_factory=dict)
 
 
 class OTLPScopeSpans(BaseModel):
     """An OTLP ``scopeSpans`` group."""
 
+    scope: dict[str, Any] = Field(default_factory=dict)
     spans: list[OTLPSpan] = Field(default_factory=list)
 
 
 class OTLPResourceSpans(BaseModel):
     """An OTLP ``resourceSpans`` group."""
 
+    resource: dict[str, Any] = Field(default_factory=dict)
     scopeSpans: list[OTLPScopeSpans] = Field(default_factory=list)
 
 
@@ -174,9 +190,10 @@ class OTLPExportRequest(BaseModel):
     resourceSpans: list[OTLPResourceSpans] = Field(default_factory=list)
 
 
-def _attr_value(kv: OTLPKeyValue) -> Any:
+def _attr_value(kv: OTLPKeyValue | dict[str, Any]) -> Any:
     """Unwrap an OTLP AnyValue into a plain Python value."""
-    v = kv.value
+    key_value = kv if isinstance(kv, OTLPKeyValue) else OTLPKeyValue.model_validate(kv)
+    v = key_value.value
     if "stringValue" in v:
         return v["stringValue"]
     if "intValue" in v:
@@ -188,6 +205,12 @@ def _attr_value(kv: OTLPKeyValue) -> Any:
         return v["doubleValue"]
     if "boolValue" in v:
         return v["boolValue"]
+    if "bytesValue" in v:
+        return v["bytesValue"]
+    if "arrayValue" in v:
+        return v["arrayValue"]
+    if "kvlistValue" in v:
+        return v["kvlistValue"]
     return None
 
 
@@ -201,7 +224,12 @@ def _nano_to_datetime(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _otlp_span_to_trace_create(span: OTLPSpan) -> TraceCreate:
+def _otlp_span_to_trace_create(
+    span: OTLPSpan,
+    *,
+    resource_attributes: dict[str, Any] | None = None,
+    scope: dict[str, Any] | None = None,
+) -> TraceCreate:
     """Convert an inbound OTLP span into a :class:`TraceCreate`."""
     attrs = {kv.key: _attr_value(kv) for kv in span.attributes}
 
@@ -215,6 +243,21 @@ def _otlp_span_to_trace_create(span: OTLPSpan) -> TraceCreate:
     for k, v in attrs.items():
         if k.startswith("llm.usage.") and isinstance(v, int):
             token_usage[k.removeprefix("llm.usage.")] = v
+
+    metadata: dict[str, Any] = {}
+    for key, value in (resource_attributes or {}).items():
+        metadata[f"otlp.resource.{key}"] = value
+    if scope:
+        if scope.get("name"):
+            metadata["otlp.scope.name"] = scope["name"]
+        if scope.get("version"):
+            metadata["otlp.scope.version"] = scope["version"]
+    if span.events:
+        metadata["otlp.events"] = span.events
+    if span.links:
+        metadata["otlp.links"] = span.links
+    if span.traceState:
+        metadata["otlp.trace_state"] = span.traceState
 
     start = _nano_to_datetime(span.startTimeUnixNano) or datetime.now(timezone.utc)
     end = _nano_to_datetime(span.endTimeUnixNano)
@@ -230,7 +273,7 @@ def _otlp_span_to_trace_create(span: OTLPSpan) -> TraceCreate:
         name=span.name,
         input_data=None,
         output_data=None,
-        metadata=None,
+        metadata=metadata or None,
         start_time=start,
         end_time=end,
         duration_ms=duration,
@@ -238,6 +281,8 @@ def _otlp_span_to_trace_create(span: OTLPSpan) -> TraceCreate:
         token_usage=token_usage or None,
         status=_OTLP_STATUS_REVERSE.get(status_code, "completed"),
         error=(span.status or {}).get("message"),
+        sampled=True,
+        sampling_reason=None,
         model=str(model) if model else None,
         provider=str(provider) if provider else None,
         feature=str(feature) if feature else None,
@@ -248,7 +293,7 @@ def _otlp_span_to_trace_create(span: OTLPSpan) -> TraceCreate:
 async def ingest_otlp_traces(
     body: OTLPExportRequest,
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> dict[str, Any]:
     """Accept an OTLP/JSON export push and ingest its spans (best-effort).
 
@@ -265,11 +310,30 @@ async def ingest_otlp_traces(
     """
     trace_creates: list[TraceCreate] = []
     for resource in body.resourceSpans:
+        resource_attrs = {
+            item["key"]: _attr_value(item)
+            for item in resource.resource.get("attributes", [])
+            if isinstance(item, dict) and "key" in item
+        }
         for scope in resource.scopeSpans:
             for span in scope.spans:
-                trace_creates.append(_otlp_span_to_trace_create(span))
+                trace_creates.append(
+                    _otlp_span_to_trace_create(
+                        span,
+                        resource_attributes=resource_attrs,
+                        scope=scope.scope,
+                    )
+                )
 
-    service = TraceService(session)
+    service = TraceService(
+        session,
+        sampling_policy=SamplingPolicy(
+            mode=settings.TRACE_SAMPLING_MODE,
+            rate=settings.TRACE_SAMPLE_RATE,
+            keep_errors=settings.TRACE_TAIL_KEEP_ERRORS,
+            slow_threshold_ms=settings.TRACE_TAIL_SLOW_MS,
+        ),
+    )
     traces = await service.ingest_spans(trace_creates) if trace_creates else []
 
     return {

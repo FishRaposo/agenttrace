@@ -10,6 +10,7 @@ from __future__ import annotations
 import time
 
 import pytest
+from app.internal.vendor_core.tracing import CostRecord, Span, SpanStatus, SpanType
 from app.services.ingest_adapters import (
     CostRecordIngest,
     SharedSpanIngest,
@@ -19,7 +20,6 @@ from app.services.ingest_adapters import (
     span_to_trace_create,
 )
 from httpx import AsyncClient
-from shared_core.tracing import CostRecord, Span, SpanStatus, SpanType
 
 
 # --------------------------------------------------------------------------- #

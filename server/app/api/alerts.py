@@ -4,15 +4,26 @@ from __future__ import annotations
 
 from typing import Annotated
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, require_roles
 from app.db import get_session
+from app.internal.rbac import Role
+from app.models.alert import (
+    AlertEvent,
+    AlertEventResponse,
+    AlertRule,
+    AlertRuleCreate,
+    AlertRuleResponse,
+)
 from app.models.run import Run
 from app.models.trace import Trace
+from app.services.alerting import acknowledge_event, evaluate_rules
+from app.services.audit import record_audit
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 @router.get("/alerts")
@@ -46,6 +57,7 @@ async def get_alerts(
     Returns:
         Dictionary with alert status and exceeded runs.
     """
+    await evaluate_rules(session)
     result = await session.execute(select(func.coalesce(func.sum(Run.total_cost), 0.0)))
     total_cost = float(result.scalar() or 0.0)
 
@@ -108,6 +120,7 @@ async def get_latency_alerts(
         Dictionary with alert status, the breaching span count, and the slowest
         offending spans.
     """
+    await evaluate_rules(session)
     breaching_stmt = (
         select(Trace)
         .where(Trace.duration_ms.isnot(None))
@@ -141,3 +154,64 @@ async def get_latency_alerts(
             for s in breaching
         ],
     }
+
+
+@router.post("/alerts/rules", response_model=AlertRuleResponse, status_code=201)
+async def create_alert_rule(
+    rule_data: AlertRuleCreate,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN)),  # noqa: B008
+) -> AlertRule:
+    rule = AlertRule(**rule_data.model_dump())
+    session.add(rule)
+    await session.flush()
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="alert.rule_create",
+        resource=f"alert-rule:{rule.id}",
+        details=rule_data.model_dump(),
+    )
+    return rule
+
+
+@router.get("/alerts/rules", response_model=list[AlertRuleResponse])
+async def list_alert_rules(
+    session: AsyncSession = Depends(get_session),
+) -> list[AlertRule]:
+    result = await session.execute(
+        select(AlertRule).order_by(AlertRule.created_at.asc())
+    )
+    return list(result.scalars().all())
+
+
+@router.get("/alerts/events", response_model=list[AlertEventResponse])
+async def list_alert_events(
+    state: str | None = Query(None, pattern="^(open|acknowledged|resolved)$"),
+    session: AsyncSession = Depends(get_session),
+) -> list[AlertEvent]:
+    await evaluate_rules(session)
+    stmt = select(AlertEvent).order_by(AlertEvent.last_seen.desc())
+    if state is not None:
+        stmt = stmt.where(AlertEvent.state == state)
+    result = await session.execute(stmt)
+    return list(result.scalars().all())
+
+
+@router.post("/alerts/events/{event_id}/ack", response_model=AlertEventResponse)
+async def ack_alert_event(
+    event_id: str,
+    session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN)),  # noqa: B008
+) -> AlertEvent:
+    event = await acknowledge_event(session, event_id)
+    if event is None:
+        raise HTTPException(status_code=404, detail="Alert event not found")
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="alert.acknowledge",
+        resource=f"alert-event:{event.id}",
+        details={"state": event.state},
+    )
+    return event

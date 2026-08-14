@@ -1,37 +1,50 @@
-# AgentTrace Setup Guide
+# AgentTrace setup guide
 
 ## Prerequisites
 
-- Python 3.12+
-- Node.js 20+ (for dashboard)
-- Docker (optional, for PostgreSQL)
+- Python 3.11+
+- Node.js 20+ for the dashboard
+- Docker only for optional PostgreSQL/Redis integration
 
-## SDK Setup
+## Canonical install
 
 ```bash
-cd sdk
-pip install -e ".[dev]"
+python -m pip install -e "sdk[dev]"
+python -m pip install -e "server[dev]"
+cd dashboard && npm ci
 ```
 
-## Server Setup
+The server wheel contains its internal compatibility subset. No sibling
+checkout, external core package, credential, or network service is required.
+
+## Start locally
 
 ```bash
 cd server
-pip install -r requirements.txt
 uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
-```
 
-The server auto-initializes an SQLite database at `./data/agenttrace.db`.
-
-## Dashboard Setup
-
-```bash
+# in a second terminal
 cd dashboard
-npm install
 npm run dev
 ```
 
-## Quick Test
+The server creates SQLite data under `server/data/` and exposes `/docs`; the
+dashboard runs at `http://localhost:3000`.
+
+## Offline proof
+
+```bash
+make demo
+make evidence
+make test
+make lint
+make typecheck
+```
+
+`make evidence` needs no credentials or network and verifies the normalized
+golden fixture. See [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
+
+## SDK smoke example
 
 ```python
 from agenttrace import Tracer
@@ -39,20 +52,20 @@ from agenttrace.exporters.api_exporter import APIExporter
 
 tracer = Tracer()
 tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api"))
-
-with tracer.run("test_operation"):
+with tracer.run("setup-smoke"):
     span = tracer.start_span("llm_call")
     span.input_data = {"prompt": "Hello"}
     span.output_data = {"response": "Hi!"}
     span.end()
     tracer.end_span(span)
-
 tracer.flush()
 ```
 
-## Docker Compose
+## Optional Docker services
 
 ```bash
-cp .env.example .env
 docker compose up --build
 ```
+
+Docker, PostgreSQL, Redis, and Grafana are integration surfaces, not default
+requirements. Review [`docs/SECURITY.md`](docs/SECURITY.md) before deployment.

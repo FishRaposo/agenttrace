@@ -1,442 +1,214 @@
 # AgentTrace
 
 [![CI](https://github.com/FishRaposo/agenttrace/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/FishRaposo/agenttrace/actions/workflows/ci.yml)
-[![Python](https://img.shields.io/badge/python-3.12-blue)]()
-[![FastAPI](https://img.shields.io/badge/FastAPI-009688?logo=fastapi)]()
-[![Next.js](https://img.shields.io/badge/Next.js-000?logo=next.js)]()
-[![Coverage](https://img.shields.io/badge/coverage-85%25-brightgreen)]()
+[![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
+[![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-**OpenTelemetry-compatible observability + FinOps for AI agents.**
+Agent observability and replay SDK with cost attribution and prompt-cost reporting.
 
-Trace LLM calls, tool executions, and multi-step workflows with **automatic cost tracking**, **budget alerts**, **live tail**, and **waterfall replay**.
+AgentTrace is a self-hostable, offline-first portfolio project for inspecting
+agent runs. It records LLM calls, tool executions, decisions, input/output,
+latency, token usage, and cost, then exposes deterministic replay, run diffing,
+JSON OTLP interoperability, live updates, and a small dashboard. The default
+demo uses SQLite, an in-memory realtime publisher, and simulated providers; no
+credentials or network-backed evaluation are required.
 
-[Quick Demo](#quick-demo) • [Architecture](#architecture) • [SDK Guide](#quickstart-local-development) • [Deploy](#deployment)
+## Quick demonstration
 
----
-
-## Quick Demo
+From the repository root:
 
 ```bash
-make demo
+make install       # SDK + server dev extras + dashboard lockfile install
+make demo          # dependency-free SDK JSONL example
+make evidence      # deterministic server-side portfolio evidence bundle
 ```
 
-Starts the trace server, dashboard, and runs a sample agent with full observability at http://localhost:3000
+The evidence command writes ignored files under `artifacts/portfolio/` and
+verifies checksums plus the committed golden result. See
+[`docs/EVIDENCE.md`](docs/EVIDENCE.md) for the review/replay walkthrough.
 
----
+To run the local services separately:
 
-## 1. What This Is
+```bash
+cd server && uvicorn app.main:app --reload --port 8000
+cd dashboard && npm run dev
+```
 
-A lightweight observability and replay layer for debugging agentic AI workflows. AgentTrace records tool calls, model invocations, intermediate decisions, input/output, latency, cost, and final results, enabling step-by-step replay and analysis of agent behavior.
+The API is available at `http://localhost:8000/docs` and the dashboard at
+`http://localhost:3000`. The dashboard has an explicit offline demo mode when
+the API is unavailable.
 
-## Problem It Solves
+## What is delivered
 
-Agentic AI workflows are complex, multi-step processes that involve:
-- Multiple LLM calls with different prompts
-- Tool invocations (search, code execution, API calls)
-- Decision points and branching logic
-- State management across steps
-
-Debugging these workflows is challenging because:
-- You can't see what happened during execution
-- It's hard to understand why an agent made a particular decision
-- Cost and token usage are opaque
-- Reproducing issues is difficult
-
-AgentTrace solves this by providing a complete execution trace with rich metadata, cost tracking, and replay capabilities.
+- Dependency-free Python SDK (`sdk/`) with decorators, context-managed runs,
+  JSONL/API exporters, provider wrappers, replay payloads, and deterministic
+  cost tracking. The SDK can be installed without the server.
+- FastAPI collector (`server/`) with SQLite by default, optional PostgreSQL,
+  canonical span/cost adapters, cost reports, run diffing, replay, and a JSON
+  subset of OTLP HTTP traces.
+- Deterministic head and tail sampling with stable SHA-256 decisions and
+  timeout handling; sampling metadata is additive to existing responses.
+- In-memory realtime publication by default, with an optional Redis adapter.
+  Existing WebSocket and SSE routes remain compatibility facades.
+- Persisted cost/latency alert rules and deduplicated events with open,
+  acknowledged, and resolved states. Delivery remains local/log based.
+- Single-tenant `admin`, `ingestor`, and `viewer` roles plus redacted audit
+  records. `AUTH_REQUIRED=false` keeps the local demo credential-free; set it
+  to `true` for a deployed collector.
+- `monitoring/grafana/agenttrace-overview.json`, a portable dashboard artifact
+  for cost, latency, throughput, errors, and sampling.
+- A reproducible evidence bundle with canonical JSON, Markdown explanation,
+  manifest hashes, realtime publication, sampling, alert, RBAC, audit, and
+  replay coverage.
 
 ## Architecture
 
-```
-┌─────────────────┐     ┌──────────────┐     ┌──────────────────┐
-│  Agent Code     │────▶│  SDK         │────▶│  APIExporter     │
-│  (Your App)     │     │  Tracer      │     │  (HTTP / Batch)  │
-└─────────────────┘     └──────────────┘     └──────────────────┘
-                              │                        │
-                              │ trace_openai()         │
-                              │ trace_anthropic()      │
-                              │ trace_llm()            ▼
-                              │                 ┌──────────────┐
-                              │                 │  Server      │
-                              │                 │  FastAPI     │
-                              │                 │  SQLAlchemy  │
-                              │                 │  SQLite/PG   │
-                              │                 └──────────────┘
-                              │                        │
-                              │                        ▼
-                              │                 ┌──────────────┐
-                              │                 │  Dashboard   │
-                              │                 │  Next.js     │
-                              │                 │  Recharts    │
-                              │                 └──────────────┘
-                              │
-                              ▼
-                     ┌──────────────┐
-                     │  HybridLLM   │
-                     │  Client      │
-                     │  (sim / real)│
-                     └──────────────┘
+```text
+agent code -> SDK -> JSONL or HTTP exporter -> FastAPI collector -> SQLite/PostgreSQL
+                                                       |                 |
+                                                       +--> realtime ----+--> dashboard
+                                                       +--> replay/diff/cost/alerts
+                                                       +--> OTLP/JSON export and ingest
 ```
 
-AgentTrace consists of three components:
+The SDK and server have an intentional boundary. Server-only compatibility
+contracts live in `server/app/internal/`; the server's small vendored core is
+attributed and pinned in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+The SDK never imports that code. The SDK's local pricing table is retained and
+golden-tested; server reporting uses the vendored registry for intentional
+parity at the ingestion boundary.
 
-1. **SDK** (`sdk/`): Python library with decorators (`trace_openai`, `trace_anthropic`, `trace_llm`), hybrid client, and distributed tracing
-2. **Server** (`server/`): FastAPI with cost analytics API, prompt-version filtering, deterministic daily JSON/CSV reports, budget tracking, batch ingestion, WebSocket live tail
-3. **Dashboard** (`dashboard/`): Next.js with runs list, prompt-version and daily cost breakdowns, live tail, budget status, waterfall replay
+## Installation and development
 
-### Feature Matrix
-
-| Feature | AgentTrace | LangSmith | Langfuse | Phoenix |
-|---------|-----------|-----------|----------|---------|
-| Open-source | ✅ | ❌ | ✅ | ✅ |
-| Self-hostable | ✅ | ❌ | ✅ | ✅ |
-| Cost tracking per span | ✅ | Partial | Partial | ❌ |
-| Budget alerts | ✅ | ❌ | ✅ | ❌ |
-| Live tail (SSE/WS) | ✅ | ❌ | ❌ | Partial |
-| Multi-agent correlation | ✅ | Partial | ❌ | ❌ |
-| Waterfall timeline | ✅ | Partial | Partial | Partial |
-| Prompt replay | ✅ | ❌ | ❌ | ❌ |
-| Run diffing | ✅ | ❌ | ❌ | ❌ |
-| Batch ingestion API | ✅ | ❌ | ❌ | ❌ |
-| Provider wrappers (OpenAI/Anthropic) | ✅ | ❌ | ❌ | ❌ |
-| Hybrid client (sim/real) | ✅ | ❌ | ❌ | ❌ |
-
-## Quickstart (Local Development)
-
-### Prerequisites
-
-- Python 3.11+
-- Node.js 20+
-- Docker (optional, for PostgreSQL)
-
-### 1. Install the SDK
+The canonical install path is:
 
 ```bash
-cd sdk
-pip install -e .
+python -m pip install -e "sdk[dev]"
+python -m pip install -e "server[dev]"
+cd dashboard && npm ci
 ```
 
-### 2. Start the Trace Server
+The server wheel includes `app/internal/vendor_core` and can be installed in a
+clean environment without any sibling checkout or external core package. The
+optional Redis integration is installed only with `server[redis]`.
+
+Useful targets:
+
+| Command | Purpose |
+| --- | --- |
+| `make test` | SDK and server pytest suites |
+| `make lint` | Ruff checks |
+| `make format` | Ruff formatting |
+| `make typecheck` | Pyright for SDK and server |
+| `make evidence` | Build and verify the offline evidence bundle |
+| `make forbidden-scan` | Check for retired external dependency references |
+| `make package` | Build both Python wheels |
+| `make dashboard-test` | Chromium Playwright smoke test |
+
+Direct verification commands used in CI are:
 
 ```bash
-cd server
-pip install -r requirements.txt
-uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
+pytest sdk/tests -q
+pytest server/tests -q
+ruff check server/app sdk/agenttrace server/tests sdk/tests
+ruff format --check server/app sdk/agenttrace server/tests sdk/tests
+pyright server/app sdk/agenttrace
 ```
 
-The server will:
-- Initialize an SQLite database at `./data/agenttrace.db`
-- Expose API at `http://localhost:8000`
-- Serve API docs at `http://localhost:8000/docs`
-
-### 3. Start the Dashboard
-
-```bash
-cd dashboard
-npm install
-npm run dev
-```
-
-The dashboard will be available at `http://localhost:3000`.
-
-### 4. Run an Example Agent
-
-```bash
-cd examples
-python research_agent.py
-```
-
-This will:
-- Create a run named "research_agent"
-- Record tool calls (`web_search`, `parse_content`)
-- Record LLM calls (`synthesize_findings`, `generate_followup_questions`)
-- Export traces to `./data/research_traces.jsonl`
-
-Use `APIExporter` instead of `JSONLExporter` when you want the example to ingest directly into the running server and appear in the dashboard.
-
-## Example Workflow
-
-### Provider-Aware Wrappers (Recommended)
+## SDK example
 
 ```python
-from agenttrace import Tracer, trace_openai, trace_anthropic
-from agenttrace.exporters import APIExporter
-
-# Or use the Hybrid Client for zero-config demos
-from agenttrace import HybridLLMClient
+from agenttrace import HybridLLMClient, Tracer
 
 tracer = Tracer()
-tracer.set_exporter(APIExporter(endpoint="http://localhost:8000/api"))
-
 client = HybridLLMClient(mode="sim", tracer=tracer)
 
-# Run with tracing
-with tracer.run("research_agent", workflow_id="research-pipeline"):
-    research = client.chat("openai", "gpt-4", messages=[
-        {"role": "user", "content": "Research AI observability trends"}
-    ])
-    summary = client.chat("anthropic", "claude-3-sonnet", messages=[
-        {"role": "user", "content": f"Summarize: {research.content}"}
-    ])
+with tracer.run("research-agent", correlation_id="demo"):
+    answer = client.chat(
+        "openai",
+        "gpt-4o-mini",
+        messages=[{"role": "user", "content": "Explain trace replay."}],
+    )
 
 tracer.flush()
+print(answer.content)
 ```
 
-### Manual Decorators
+Provider wrappers and manual decorators are documented in
+[`docs/SDK.md`](docs/SDK.md). Simulation is deterministic; real providers are
+opt-in and require their own credentials.
 
-```python
-from agenttrace import Tracer
-from agenttrace.wrappers import trace_tool, trace_llm
+## HTTP surface
 
-tracer = Tracer()
+| Route | Purpose |
+| --- | --- |
+| `POST /api/traces`, `/api/traces/batch` | Native SDK span ingestion |
+| `POST /api/traces/spans` | Canonical span-shaped ingestion adapter |
+| `POST /api/traces/costs` | Canonical cost-record ingestion adapter |
+| `GET /api/runs`, `/api/replay/runs/{id}` | Run listing and read-only replay |
+| `GET /api/diff/runs` | Deterministic run comparison |
+| `GET /api/costs/*` | Cost summaries and daily JSON/CSV reports |
+| `GET /api/alerts`, `/api/alerts/latency` | Backward-compatible alert views |
+| `/api/alerts/rules`, `/api/alerts/events` | Persisted alert rules, state, and acknowledgement |
+| `GET/POST /api/otlp/v1/traces` | OTLP HTTP/JSON resource/span subset |
+| `/ws/traces`, `/api/stream` | Realtime WebSocket and SSE compatibility routes |
+| `/api/auth/*`, `/api/audit` | Local JWT auth, roles, and admin audit view |
 
-@trace_tool(tracer)
-def web_search(query: str) -> dict:
-    return {"results": [...]}
+Inbound adapters preserve existing JSON keys, enum vocabulary, unknown-value
+fallbacks, and cost semantics. New sampling, provider, usage, and audit fields
+are additive. See [`docs/COMPATIBILITY.md`](docs/COMPATIBILITY.md) and
+[`docs/OTLP.md`](docs/OTLP.md).
 
-@trace_llm(tracer, model="gpt-4", feature="summarization")
-def synthesize(context: str) -> str:
-    return "Summary..."
+## Configuration
 
-with tracer.run("agent", correlation_id="workflow-123"):
-    results = web_search("AI debugging")
-    summary = synthesize(str(results))
-```
+The server reads `.env` values through Pydantic settings. Important defaults:
 
-### Multi-Agent with Correlation ID
-
-```python
-from agenttrace import Tracer, HybridLLMClient
-
-tracer = Tracer()
-correlation_id = tracer.generate_id()
-
-# Agent A (researcher)
-with tracer.start_run("researcher", metadata={"correlation_id": correlation_id}):
-    client = HybridLLMClient(tracer=tracer)
-    research = client.chat("openai", "gpt-4", messages=[{"role": "user", "content": "Research"}])
-
-# Agent B (summarizer) — same correlation_id links them in dashboard
-with tracer.start_run("summarizer", metadata={"correlation_id": correlation_id}):
-    summary = client.chat("anthropic", "claude-3", messages=[{"role": "user", "content": "Summarize"}])
-```
-
-## Key Design Decisions
-
-### Span-Based Tracing
-
-AgentTrace uses a span-based tracing model inspired by OpenTelemetry. Each operation (LLM call, tool call, decision) is a span with:
-- Unique ID and parent span ID for nesting
-- Type (LLM_CALL, TOOL_CALL, DECISION, RETRIEVAL, CUSTOM)
-- Input/output data
-- Start/end times and duration
-- Cost and token usage
-- Status (STARTED, COMPLETED, ERROR)
-
-This enables composable, nestable tracing that mirrors the structure of agent workflows.
-
-### Context Variables
-
-The SDK uses Python's `contextvars` for thread-safe and asyncio-safe state management. The current run ID and active span are stored in context variables, allowing instrumentation to access the current trace context without explicit passing.
-
-### Multi-Agent Trace Correlation
-
-AgentTrace supports correlating traces across multiple agent instances using a `correlation_id`. This is useful for:
-- Distributed agent workflows
-- Multi-agent systems
-- Tracking related executions across different services
-
-Use the `correlation_id` parameter when starting a run:
-
-```python
-with tracer.run("agent_task", correlation_id="workflow-123"):
-    # Agent execution
-```
-
-### Trace Diffing
-
-AgentTrace provides a diff API to compare two runs side-by-side, showing:
-- Cost differences
-- Token usage differences
-- Span count differences
-- Duration differences
-- Span-level differences (added, removed, changed)
-
-Use the diff API endpoint: `/api/diff/runs?run_id_1=<id>&run_id_2=<id>`
-
-### Prompt Replay
-
-AgentTrace captures all inputs and outputs for each span, enabling step-by-step replay of agent execution. The replay endpoint returns all steps in chronological order with full input/output data.
-
-Use the replay API endpoint: `/api/replay/runs/<run_id>`
-
-### JSONL Export
-
-JSONL (JSON Lines) is used for local development because:
-- Human-readable and grep-able
-- Easy to parse and analyze
-- Supports streaming writes
-- No external dependencies
-
-For production, the SDK supports HTTP export to the AgentTrace server and OTLP export to OpenTelemetry-compatible systems.
-
-### Separate Server
-
-The server is a separate FastAPI application because:
-- Decouples tracing from agent execution
-- Enables real-time dashboard updates
-- Supports multiple agents sharing a trace store
-- Provides a REST API for custom integrations
-
-### Pydantic Schemas
-
-Both the SDK and server use Pydantic for type-safe validation at boundaries:
-- SDK: Validates data before export
-- Server: Validates incoming API requests
-- Ensures consistency across components
-
-## Failure Handling
-
-The SDK is designed to be non-blocking:
-- Export failures are logged but don't raise exceptions
-- Context variables are cleared on run completion
-- The tracer can be used without an exporter (no-op mode)
-
-The server includes:
-- Global exception handler for unhandled errors
-- Database transaction rollback on failure
-- Graceful degradation when optional features are missing
-
-The dashboard includes a **demo mode**: when the trace backend is unreachable,
-read requests fall back to bundled fixtures and a visible banner appears, so the
-UI stays fully explorable offline (set `NEXT_PUBLIC_DEMO_MODE=1` to force it).
-
-## Cross-Service Ingestion & Interop
-
-Beyond the native SDK exporter, the collector accepts telemetry from other
-services built on the `shared_core` standard, and interoperates with
-OpenTelemetry tooling (best-effort, JSON subset):
-
-| Endpoint | Purpose |
-|----------|---------|
-| `POST /api/traces` · `/api/traces/batch` | Native SDK span ingestion |
-| `POST /api/traces/spans` | Canonical `shared_core.tracing.Span` ingestion (e.g. `hermes-agent-framework`) |
-| `POST /api/traces/costs` | LCM-style `shared_core.tracing.CostRecord` ingestion |
-| `GET /api/alerts` | Cost-threshold alert (daily + per-run) |
-| `GET /api/alerts/latency` | Per-span latency-threshold alert |
-| `GET /api/otlp/v1/traces` | Export stored spans as OTLP/JSON `ResourceSpans` |
-| `POST /api/otlp/v1/traces` | Ingest an OTLP/JSON `ExportTraceServiceRequest` |
-| `GET /api/costs/summary?prompt_version=` | Cost totals and breakdowns, optionally filtered by an exact prompt-version metadata tag |
-| `GET /api/costs/reports/daily?day=&prompt_version=&format=json\|csv` | Deterministic UTC daily LLM cost, token, latency, and error rollups |
-
-Inbound cost is taken **verbatim** — adapters normalize the canonical shapes
-into AgentTrace's `TraceCreate` and never recompute pricing, so cost analytics
-stay byte-for-byte stable. Missing runs are auto-created so foreign spans never
-drop. See [docs/design-decisions.md](docs/design-decisions.md) and
-[docs/EXECUTION_PLAN.md](docs/EXECUTION_PLAN.md).
-
-## Testing Strategy
-
-- **SDK**: Unit tests for Tracer, Span, exporters, and wrappers
-- **Server**: Integration tests for API endpoints and end-to-end workflows
-- **Dashboard**: E2E tests with Playwright
-
-Run tests with:
-
-```bash
-# SDK
-cd sdk && pytest tests/ -v
-
-# Server
-cd server && pytest tests/ -v
-
-# Dashboard
-cd dashboard && npm run test:e2e
-```
-
-## Deployment
-
-### Docker Compose (Recommended)
-
-```bash
-cp .env.example .env
-docker compose up --build
-```
-
-The server auto-migrates on first boot and seeds demo data if empty. Full guide: [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
-
-### Benchmarks
-
-Run on a local laptop (SQLite, single worker):
-
-```bash
-$ python scripts/benchmark.py
-AgentTrace Ingestion Benchmark
-==================================================
-[Single Trace] 100 sequential requests...
-  Throughput: 45 traces/sec
-  Avg latency: 18ms
-
-[Concurrent] 10 workers x 50 traces = 500 traces...
-  Throughput: 280 traces/sec
-  Avg latency: 22ms
-
-[Batch] 10 batches x 50 traces = 500 traces...
-  Throughput: 520 traces/sec
-  Avg batch latency: 95ms
-```
-
-### Production Database
-
-For production, use PostgreSQL instead of SQLite:
-
-```bash
-export DATABASE_URL="postgresql+asyncpg://user:password@host:5432/agenttrace"
-export DATABASE_TYPE=postgres
-```
-
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `DATABASE_URL` | SQLite | SQLAlchemy connection string |
+| Variable | Default | Meaning |
+| --- | --- | --- |
+| `DATABASE_URL` | `sqlite+aiosqlite:///./data/agenttrace.db` | Local persistence |
 | `DATABASE_TYPE` | `sqlite` | `sqlite` or `postgres` |
-| `SERVER_HOST` | `0.0.0.0` | API bind address |
-| `SERVER_PORT` | `8000` | API port |
-| `CORS_ORIGINS` | `http://localhost:3000` | Allowed origins |
-| `AGENTTRACE_LLM_MODE` | `sim` | `sim` (mock) or `real` |
-| `OPENAI_API_KEY` | — | Required for real mode |
-| `ANTHROPIC_API_KEY` | — | Required for real mode |
+| `AUTH_REQUIRED` | `false` | Require JWT for protected observability and mutation routes |
+| `REALTIME_BACKEND` | `memory` | `memory` or optional `redis` |
+| `TRACE_SAMPLING_MODE` | `off` | `off`, `head`, or `tail` |
+| `TRACE_SAMPLE_RATE` | `1.0` | Stable SHA-256 retention rate |
+| `TRACE_TAIL_SLOW_MS` | unset | Tail-sampling slow-span override |
+| `TRACE_TAIL_KEEP_ERRORS` | `true` | Retain error/failed terminal traces |
+| `REDIS_URL` | unset | Optional Redis transport/rate-limit backend |
+| `AGENTTRACE_LLM_MODE` | `sim` | SDK simulation or opt-in real provider mode |
+| `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | unset | Only needed for real provider calls |
 
-## CI/CD Pipeline
+For deployment and database options, see [`docs/DEPLOYMENT.md`](docs/DEPLOYMENT.md)
+and [`docs/SECURITY.md`](docs/SECURITY.md). PostgreSQL, Redis, Docker, and
+Grafana are optional integration surfaces, never default requirements.
 
-AgentTrace includes a GitHub Actions CI/CD pipeline that:
+## Evidence and portfolio review
 
-- Runs SDK tests with pytest
-- Runs server tests with pytest
-- Builds the dashboard (Next.js production build)
-- Builds Docker images for server and dashboard (without pushing to a registry)
+`make evidence` runs the fixed SQLite/in-memory scenario, including canonical
+ingestion, OTLP metadata, sampling, cost attribution, alert state, RBAC,
+redaction, replay-shaped output, and realtime publication. It writes:
 
-The pipeline is configured in `.github/workflows/ci.yml`.
+- `manifest.json` with mode, result hash, and reproducibility hash;
+- canonical `report.json` and human-readable `report.md`;
+- `checksums.sha256` for tamper detection.
 
-## What This Project Demonstrates
+The normalized report is compared with
+`server/tests/fixtures/golden/portfolio-evidence.json`. Generated evidence is
+ignored; only the small golden fixture is tracked. Verification failures are
+non-zero for missing files, malformed JSON, checksum mismatches, tampering, or
+golden drift.
 
-This project demonstrates:
-- **Three-tier architecture**: SDK → Server → Dashboard
-- **Async/await patterns**: Python async for server, React hooks for dashboard
-- **Type safety**: Python type hints, TypeScript, Pydantic validation
-- **Modern web stack**: FastAPI, Next.js 14, Tailwind CSS, Recharts
-- **Database design**: SQLAlchemy ORM, migrations, indexing, cost attribution columns
-- **Testing**: pytest, pytest-asyncio, 85% coverage gate
-- **Docker**: Multi-container deployment with healthchecks, auto-migrate, auto-seed
-- **Observability**: Span-based tracing, cost tracking, token usage, waterfall timeline
-- **FinOps**: Cost analytics API, budget tracking, burn-rate projection, per-model and per-prompt-version breakdowns, deterministic daily JSON/CSV reports
-- **Multi-agent correlation**: Correlation IDs for distributed workflows
-- **Trace diffing**: Compare runs for regression testing
-- **Prompt replay**: Step-by-step replay for debugging
-- **Provider wrappers**: `trace_openai()`, `trace_anthropic()` with automatic token/cost extraction
-- **Hybrid client**: Deterministic mock mode (`sim`) or live API mode (`real`) via env var
-- **Batch ingestion**: `/api/traces/batch` for high-throughput export
-- **Live tail**: SSE streaming of incoming spans in real time
-- **Authentication**: JWT-based API authentication
-- **Developer experience**: Decorators, context managers, API docs
-- **CI/CD**: GitHub Actions with automated testing and deployment
+## Deliberate boundaries
+
+This repository delivers the local engineering core while keeping the default
+path inspectable and reproducible. Hosted/team tenancy, hosted scheduling,
+Slack/Discord/webhook delivery, external notification services, OTLP
+protobuf/gRPC, and mandatory Redis/PostgreSQL/Grafana services remain deferred.
+No changes are required in `aria-agent` or any other repository.
+
+## License and provenance
+
+AgentTrace is released under the MIT license. The server's vendored compatibility
+subset is documented, attributed, and pinned in
+[`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). See
+[`docs/decisions/2026-08-14-agenttrace-local-core.md`](docs/decisions/2026-08-14-agenttrace-local-core.md)
+for the compatibility and pricing boundary decision.

@@ -7,7 +7,7 @@ from datetime import datetime, timezone
 from typing import Any, Optional
 
 from pydantic import AliasChoices, BaseModel, Field, model_validator
-from sqlalchemy import JSON, DateTime, Float, String, Text
+from sqlalchemy import JSON, Boolean, DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base
@@ -72,6 +72,8 @@ class Trace(Base):
     feature: Mapped[Optional[str]] = mapped_column(
         String(100), nullable=True, index=True
     )
+    sampled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    sampling_reason: Mapped[Optional[str]] = mapped_column(String(50), nullable=True)
 
 
 class TraceCreate(BaseModel):
@@ -116,6 +118,10 @@ class TraceCreate(BaseModel):
     model: Optional[str] = Field(None, description="LLM model name")
     provider: Optional[str] = Field(None, description="LLM provider")
     feature: Optional[str] = Field(None, description="Feature or workflow component")
+    sampled: bool = Field(True, description="Whether the span was retained by sampling")
+    sampling_reason: Optional[str] = Field(
+        None, description="Deterministic sampling decision reason"
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -160,10 +166,12 @@ class TraceResponse(BaseModel):
     model: Optional[str] = None
     provider: Optional[str] = None
     feature: Optional[str] = None
+    sampled: bool = True
+    sampling_reason: Optional[str] = None
 
     @model_validator(mode="before")
     @classmethod
-    def from_orm(cls, data: Any) -> Any:
+    def from_source(cls, data: Any) -> Any:
         if isinstance(data, dict):
             return data
         if hasattr(data, "trace_metadata"):
@@ -187,5 +195,7 @@ class TraceResponse(BaseModel):
                 "model": data.model,
                 "provider": data.provider,
                 "feature": data.feature,
+                "sampled": data.sampled,
+                "sampling_reason": data.sampling_reason,
             }
         return data

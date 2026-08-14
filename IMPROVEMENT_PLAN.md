@@ -1,4 +1,8 @@
-# AgentTrace — Improvement Plan
+# AgentTrace — Historical Improvement Plan
+
+> Historical audit captured before the 2026-08-14 comprehensive finalization.
+> Its bug claims and priorities are not current-state assertions; use the live
+> code, tests, README, and `ROADMAP.md` for the delivered implementation.
 
 > Comprehensive audit of bugs, inconsistencies, missing features, and growth opportunities.
 > Priority levels: **P0** (broken/blocking), **P1** (high value), **P2** (polish), **P3** (long-term growth).

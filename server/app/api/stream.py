@@ -7,16 +7,18 @@ import json
 import logging
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy import select
 
+from app.api.auth import require_roles
 from app.db import async_session_factory
+from app.internal.rbac import Role
 from app.models.trace import Trace
 
 logger = logging.getLogger(__name__)
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 @router.get("/stream/traces")

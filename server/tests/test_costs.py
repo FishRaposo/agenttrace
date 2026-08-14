@@ -201,12 +201,8 @@ async def test_daily_cost_report_is_deterministic_and_filters_llm_traces(
     """Changing row order, metric math, or LLM-only filtering must break this test."""
     await _seed_prompt_costs(client)
 
-    first = await client.get(
-        "/api/costs/reports/daily?day=2026-08-10&format=json"
-    )
-    second = await client.get(
-        "/api/costs/reports/daily?day=2026-08-10&format=json"
-    )
+    first = await client.get("/api/costs/reports/daily?day=2026-08-10&format=json")
+    second = await client.get("/api/costs/reports/daily?day=2026-08-10&format=json")
 
     assert first.status_code == 200
     assert first.content == second.content
@@ -327,8 +323,7 @@ async def test_daily_cost_report_buckets_timezone_offsets_by_utc_day(
     assert csv_rows[0]["estimated_cost"] == "0.03"
 
     prior_day = await client.get(
-        "/api/costs/reports/daily?day=2026-08-10"
-        "&prompt_version=timezone-v1&format=json"
+        "/api/costs/reports/daily?day=2026-08-10&prompt_version=timezone-v1&format=json"
     )
     assert prior_day.status_code == 200
     assert prior_day.json()["days"] == {}

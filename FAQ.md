@@ -13,9 +13,10 @@ tracer.flush()
 ```
 
 ## Q: Can I use this with OpenTelemetry?
-**A:** Yes. The SDK includes an OTLP exporter that converts AgentTrace spans to OpenTelemetry format and sends them to any OTLP-compatible backend (Jaeger, Zipkin, Datadog, etc.):
+**A:** Yes, through the supported OTLP HTTP/JSON subset. The SDK can export OTLP-shaped spans, and the server accepts or exports `ResourceSpans` at `/api/otlp/v1/traces`:
 ```python
 from agenttrace.exporters.otlp import OTLPExporter
 
 tracer.set_exporter(OTLPExporter(endpoint="http://localhost:4318/v1/traces"))
 ```
+Protobuf/gRPC ingestion remains deliberately deferred. See [`docs/OTLP.md`](docs/OTLP.md).

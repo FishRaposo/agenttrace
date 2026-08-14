@@ -1,0 +1,25 @@
+{
+  "run": {
+    "id": "golden-run",
+    "name": "run_for_replay",
+    "status": "completed",
+    "start_time": "2026-08-14T12:00:00+00:00",
+    "end_time": null,
+    "metadata": null
+  },
+  "steps": [
+    {
+      "id": "golden-trace-1",
+      "name": "gpt-4",
+      "span_type": "llm_call",
+      "input_data": {"prompt": "Hello"},
+      "output_data": {"completion": "Hi there!"},
+      "metadata": null,
+      "start_time": "2026-08-14T12:00:00+00:00",
+      "end_time": null,
+      "status": "completed",
+      "error": null
+    }
+  ],
+  "total_steps": 1
+}

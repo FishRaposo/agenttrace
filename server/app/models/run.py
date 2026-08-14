@@ -119,7 +119,7 @@ class RunResponse(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def from_orm(cls, data: Any) -> Any:
+    def from_source(cls, data: Any) -> Any:
         if isinstance(data, dict):
             return data
         if hasattr(data, "run_metadata"):

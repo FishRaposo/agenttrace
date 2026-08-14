@@ -8,10 +8,8 @@ from collections import defaultdict
 from datetime import datetime, timezone
 from typing import Any, Iterable
 
-from shared_core.llmmetrics import LLMMetrics
-
+from app.internal.vendor_core.llmmetrics import LLMMetrics
 from app.models.trace import Trace
-
 
 CSV_FIELDS = [
     "day",
@@ -35,9 +33,7 @@ def prompt_version(trace: Trace) -> str:
     return str(value) if value not in (None, "") else "unversioned"
 
 
-def filter_prompt_version(
-    traces: Iterable[Trace], version: str | None
-) -> list[Trace]:
+def filter_prompt_version(traces: Iterable[Trace], version: str | None) -> list[Trace]:
     """Filter LLM traces by exact prompt version when a version is supplied."""
     rows = list(traces)
     if version is None:

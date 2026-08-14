@@ -8,10 +8,12 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import delete, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import User, get_optional_user
+from app.api.auth import User, require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceResponse
+from app.services.audit import record_audit
 
 router = APIRouter()
 
@@ -20,7 +22,7 @@ router = APIRouter()
 async def create_run(
     run_data: RunCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> Run:
     """Create or update an agent run.
 
@@ -75,6 +77,7 @@ async def list_runs(
     limit: int = Query(20, ge=1, le=100, description="Page size"),
     offset: int = Query(0, ge=0, description="Page offset"),
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> RunListResponse:
     """List runs with pagination, status filtering, name search, and
     correlation ID filtering.
@@ -111,13 +114,19 @@ async def list_runs(
     result = await session.execute(list_stmt.limit(limit).offset(offset))
     runs = list(result.scalars().all())
 
-    return RunListResponse(runs=runs, total=total, limit=limit, offset=offset)
+    return RunListResponse(
+        runs=[RunResponse.model_validate(run) for run in runs],
+        total=total,
+        limit=limit,
+        offset=offset,
+    )
 
 
 @router.get("/runs/{run_id}", response_model=RunResponse)
 async def get_run(
     run_id: str,
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> Run:
     """Get a specific run by its ID.
 
@@ -146,6 +155,7 @@ async def get_run_spans(
     limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Result offset"),
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> list[Trace]:
     """Get trace spans for a specific run with pagination.
 
@@ -173,7 +183,7 @@ async def get_run_spans(
 async def delete_run(
     run_id: str,
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.ADMIN)),  # noqa: B008
 ) -> None:
     """Delete a run and all associated traces.
 
@@ -193,3 +203,9 @@ async def delete_run(
 
     await session.execute(delete(Trace).where(Trace.run_id == run_id))
     await session.delete(run)
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="run.delete",
+        resource=f"run:{run_id}",
+    )

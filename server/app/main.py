@@ -8,11 +8,9 @@ from typing import AsyncGenerator
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from shared_core.errors import BaseApplicationError, application_error_handler
-from shared_core.logging import RequestLoggingMiddleware
-from shared_core.ratelimit import RateLimiter, RateLimitMiddleware
 
 from app.api.alerts import router as alerts_router
+from app.api.audit import router as audit_router
 from app.api.auth import router as auth_router
 from app.api.budgets import router as budgets_router
 from app.api.costs import router as costs_router
@@ -29,6 +27,12 @@ from app.api.traces import router as traces_router
 from app.config import settings
 from app.core.logging import setup_logging
 from app.db import init_db
+from app.internal.vendor_core.errors import (
+    BaseApplicationError,
+    application_error_handler,
+)
+from app.internal.vendor_core.logging import RequestLoggingMiddleware
+from app.internal.vendor_core.ratelimit import RateLimiter, RateLimitMiddleware
 
 
 @asynccontextmanager
@@ -62,14 +66,18 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-app.add_middleware(
-    RateLimitMiddleware, limiter=RateLimiter(limit=100, window_seconds=60)
-)
+rate_limiter = RateLimiter(limit=100, window_seconds=60)
+app.state.rate_limiter = rate_limiter
+app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
 app.add_middleware(RequestLoggingMiddleware)
 
-app.add_exception_handler(BaseApplicationError, application_error_handler)
+app.add_exception_handler(  # type: ignore[reportArgumentType]
+    BaseApplicationError,
+    application_error_handler,  # type: ignore[reportArgumentType]
+)
 
 app.include_router(alerts_router, prefix="/api", tags=["alerts"])
+app.include_router(audit_router, prefix="/api", tags=["audit"])
 app.include_router(auth_router, prefix="/api", tags=["auth"])
 app.include_router(budgets_router, prefix="/api", tags=["budgets"])
 app.include_router(costs_router, prefix="/api", tags=["costs"])

@@ -9,6 +9,7 @@ from typing import Any, Optional
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.internal.sampling import SamplingPolicy
 from app.models.run import Run, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
 
@@ -30,8 +31,20 @@ class TraceService:
         session: Async SQLAlchemy session for database operations.
     """
 
-    def __init__(self, session: AsyncSession) -> None:
+    def __init__(
+        self, session: AsyncSession, sampling_policy: SamplingPolicy | None = None
+    ) -> None:
         self._session = session
+        self._sampling_policy = sampling_policy or SamplingPolicy()
+
+    def _decision(self, trace_data: TraceCreate):
+        return self._sampling_policy.decide(
+            # Sampling is a trace/run decision: every span in one run must
+            # receive the same deterministic head decision.
+            trace_id=trace_data.run_id,
+            status=trace_data.status,
+            duration_ms=trace_data.duration_ms,
+        )
 
     async def ingest_trace(self, trace_data: TraceCreate) -> Trace:
         """Ingest a new trace record and update run stats incrementally.
@@ -42,6 +55,7 @@ class TraceService:
         Returns:
             The persisted Trace record.
         """
+        decision = self._decision(trace_data)
         trace = Trace(
             id=str(uuid.uuid4()),
             run_id=trace_data.run_id,
@@ -62,7 +76,11 @@ class TraceService:
             model=trace_data.model,
             provider=trace_data.provider,
             feature=trace_data.feature,
+            sampled=decision.sampled,
+            sampling_reason=decision.reason,
         )
+        if not decision.sampled:
+            return trace
         self._session.add(trace)
         await self._session.flush()
 
@@ -89,6 +107,7 @@ class TraceService:
         run_deltas: dict[str, tuple[float, int, int]] = {}
 
         for trace_data in trace_data_list:
+            decision = self._decision(trace_data)
             trace = Trace(
                 id=str(uuid.uuid4()),
                 run_id=trace_data.run_id,
@@ -109,11 +128,16 @@ class TraceService:
                 model=trace_data.model,
                 provider=trace_data.provider,
                 feature=trace_data.feature,
+                sampled=decision.sampled,
+                sampling_reason=decision.reason,
             )
-            self._session.add(trace)
+            if decision.sampled:
+                self._session.add(trace)
             traces.append(trace)
 
             # Aggregate deltas per run
+            if not decision.sampled:
+                continue
             cost = trace_data.cost_usd or 0.0
             tokens = (trace_data.token_usage or {}).get("total_tokens", 0)
             prev_cost, prev_tokens, prev_count = run_deltas.get(

@@ -1,0 +1,15 @@
+{
+  "status": "demo",
+  "service": "agenttrace-demo",
+  "stats": {
+    "total_runs": 4,
+    "total_cost": 0.3751,
+    "total_tokens": 167532,
+    "avg_duration_ms": 842.5
+  },
+  "known_run": "demo-run-001",
+  "cost_summary": {
+    "total_spans": 67,
+    "by_provider": {"openai": 0.291, "anthropic": 0.084}
+  }
+}

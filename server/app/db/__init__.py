@@ -1,18 +1,18 @@
 """Database module.
 
-Async SQLAlchemy engine and session factory (shared_core-backed).
+Async SQLAlchemy engine and session factory backed by the internal compatibility layer.
 """
 
 from __future__ import annotations
 
 from typing import AsyncGenerator
 
-from shared_core.database import AsyncDatabaseManager
 from sqlalchemy import inspect, select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import DeclarativeBase
 
 from app.config import settings
+from app.internal.vendor_core.database import AsyncDatabaseManager
 
 _db = AsyncDatabaseManager(
     settings.DATABASE_URL,
@@ -56,6 +56,7 @@ async def init_db() -> None:
             demo = User(
                 username="admin",
                 hashed_password=get_password_hash("admin123"),
+                role="admin",
             )
             session.add(demo)
             await session.commit()
@@ -73,5 +74,22 @@ def _repair_sqlite_schema(sync_conn) -> None:
             text(
                 "CREATE INDEX IF NOT EXISTS ix_runs_correlation_id "
                 "ON runs (correlation_id)"
+            )
+        )
+    trace_columns = {column["name"] for column in inspector.get_columns("traces")}
+    if "sampled" not in trace_columns:
+        sync_conn.execute(
+            text("ALTER TABLE traces ADD COLUMN sampled BOOLEAN NOT NULL DEFAULT 1")
+        )
+    if "sampling_reason" not in trace_columns:
+        sync_conn.execute(
+            text("ALTER TABLE traces ADD COLUMN sampling_reason VARCHAR(50)")
+        )
+    user_columns = {column["name"] for column in inspector.get_columns("users")}
+    if "role" not in user_columns:
+        sync_conn.execute(
+            text(
+                "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL "
+                "DEFAULT 'viewer'"
             )
         )

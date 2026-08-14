@@ -51,12 +51,16 @@
 
 **Deliverable**: Production-deployable system with provider wrappers and high-throughput batch export.
 
-## Phase 4 — Future
+## Phase 4 — Local engineering (Complete)
 
-- [ ] OTLP export (OpenTelemetry compatibility)
-- [ ] Trace sampling (head-based / tail-based)
-- [ ] Redis-based realtime pub/sub for multi-instance deployments
-- [ ] Grafana dashboard JSON
-- [ ] Alerting on latency regression and cost spikes
-- [ ] RBAC (user roles and team scoping)
-- [ ] Audit log for compliance
+- [x] OTLP HTTP/JSON resource, scope, event, link, status, and timestamp support
+- [x] Deterministic head/tail sampling with error/slow overrides and buffering
+- [x] Pluggable in-memory realtime transport with optional Redis adapter
+- [x] Grafana dashboard JSON artifact
+- [x] Persisted cost/latency alerts with deduplication and acknowledgement
+- [x] Single-tenant admin/ingestor/viewer RBAC
+- [x] Redacted audit log and admin read endpoint
+- [x] Reproducible offline portfolio evidence and wheel-install checks
+
+Hosted/team workflows, external notifications/scheduling, OTLP protobuf/gRPC,
+and mandatory infrastructure services remain deferred product boundaries.

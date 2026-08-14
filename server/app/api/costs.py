@@ -8,7 +8,9 @@ from fastapi import APIRouter, Depends, Query, Response
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.run import Run
 from app.models.trace import Trace
 from app.services.cost_reporting import (
@@ -18,7 +20,7 @@ from app.services.cost_reporting import (
     report_to_csv,
 )
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 def _token_sum(token_usage: dict | None) -> int:
@@ -128,9 +130,7 @@ async def get_daily_cost_report(
 ) -> dict | Response:
     """Return deterministic JSON or CSV daily cost and latency rollups."""
     result = await session.execute(select(Trace).order_by(Trace.start_time, Trace.id))
-    report = build_daily_report(
-        result.scalars().all(), day=day, version=prompt_version
-    )
+    report = build_daily_report(result.scalars().all(), day=day, version=prompt_version)
     if report_format == "csv":
         return Response(
             content=report_to_csv(report),

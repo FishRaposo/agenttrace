@@ -8,17 +8,20 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.run import Run
 from app.models.trace import Trace
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 @router.get("/replay/runs/{run_id}")
 async def get_replay_data(
     run_id: str,
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> dict[str, Any]:
     """Get replay data for a run, including all LLM prompts and inputs.
 

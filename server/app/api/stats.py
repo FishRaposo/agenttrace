@@ -6,7 +6,9 @@ from fastapi import APIRouter, Depends
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.run import Run
 from app.models.trace import Trace
 
@@ -16,6 +18,7 @@ router = APIRouter()
 @router.get("/stats")
 async def get_stats(
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> dict:
     total_runs_result = await session.execute(select(func.count()).select_from(Run))
     total_runs = total_runs_result.scalar() or 0

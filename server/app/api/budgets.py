@@ -8,17 +8,21 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.api.auth import User, require_roles
 from app.db import get_session
+from app.internal.rbac import Role
 from app.models.budget import Budget, BudgetCreate, BudgetResponse, BudgetStatusResponse
 from app.models.trace import Trace
+from app.services.audit import record_audit
 
-router = APIRouter()
+router = APIRouter(dependencies=[Depends(require_roles(Role.VIEWER))])
 
 
 @router.post("/budgets", response_model=BudgetResponse, status_code=201)
 async def create_budget(
     data: BudgetCreate,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN)),  # noqa: B008
 ) -> Budget:
     """Create a new budget definition."""
     budget = Budget(
@@ -31,6 +35,13 @@ async def create_budget(
     )
     session.add(budget)
     await session.flush()
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="budget.create",
+        resource=f"budget:{budget.id}",
+        details={"name": data.name, "scope": data.scope, "limit_usd": data.limit_usd},
+    )
     return budget
 
 
@@ -59,11 +70,18 @@ async def get_budget(
 async def delete_budget(
     budget_id: str,
     session: AsyncSession = Depends(get_session),
+    current_user: User = Depends(require_roles(Role.ADMIN)),  # noqa: B008
 ) -> None:
     """Delete a budget."""
     budget = await session.get(Budget, budget_id)
     if not budget:
         raise HTTPException(status_code=404, detail="Budget not found")
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="budget.delete",
+        resource=f"budget:{budget_id}",
+    )
     await session.delete(budget)
 
 

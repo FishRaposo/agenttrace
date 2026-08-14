@@ -7,10 +7,15 @@ from typing import Optional
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.auth import User, get_optional_user
+from app.api.auth import User, require_roles
 from app.api.realtime import broadcast_trace
+from app.config import settings
 from app.db import get_session
+from app.internal.rbac import Role
+from app.internal.sampling import SamplingPolicy
 from app.models.trace import Trace, TraceCreate, TraceResponse
+from app.services.alerting import evaluate_rules
+from app.services.audit import record_audit
 from app.services.ingest_adapters import (
     CostRecordIngest,
     SharedSpanIngest,
@@ -20,6 +25,18 @@ from app.services.ingest_adapters import (
 from app.services.trace_service import TraceService
 
 router = APIRouter()
+
+
+def _service(session: AsyncSession) -> TraceService:
+    return TraceService(
+        session,
+        sampling_policy=SamplingPolicy(
+            mode=settings.TRACE_SAMPLING_MODE,
+            rate=settings.TRACE_SAMPLE_RATE,
+            keep_errors=settings.TRACE_TAIL_KEEP_ERRORS,
+            slow_threshold_ms=settings.TRACE_TAIL_SLOW_MS,
+        ),
+    )
 
 
 async def _broadcast(trace: Trace) -> None:
@@ -35,6 +52,8 @@ async def _broadcast(trace: Trace) -> None:
             "duration_ms": trace.duration_ms,
             "cost_usd": trace.cost_usd,
             "timestamp": trace.start_time.isoformat() if trace.start_time else None,
+            "sampled": trace.sampled,
+            "sampling_reason": trace.sampling_reason,
         }
     )
 
@@ -43,7 +62,7 @@ async def _broadcast(trace: Trace) -> None:
 async def ingest_trace(
     trace_data: TraceCreate,
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> Trace:
     """Ingest a new trace span from the SDK.
 
@@ -56,8 +75,16 @@ async def ingest_trace(
     Returns:
         The created trace record.
     """
-    service = TraceService(session)
+    service = _service(session)
     trace = await service.ingest_trace(trace_data)
+    await evaluate_rules(session)
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="trace.ingest",
+        resource=f"run:{trace.run_id}",
+        details={"span_id": trace.span_id},
+    )
     await _broadcast(trace)
     return trace
 
@@ -66,7 +93,7 @@ async def ingest_trace(
 async def ingest_traces_batch(
     trace_data_list: list[TraceCreate],
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> list[Trace]:
     """Ingest multiple trace spans in a single request.
 
@@ -79,8 +106,16 @@ async def ingest_traces_batch(
     Returns:
         The created trace records.
     """
-    service = TraceService(session)
+    service = _service(session)
     traces = await service.ingest_traces_batch(trace_data_list)
+    await evaluate_rules(session)
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="trace.batch_ingest",
+        resource="traces",
+        details={"count": len(traces)},
+    )
     for trace in traces:
         await _broadcast(trace)
     return traces
@@ -93,6 +128,7 @@ async def list_traces(
     limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Result offset"),
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> list[Trace]:
     """List traces with optional filtering.
 
@@ -106,7 +142,7 @@ async def list_traces(
     Returns:
         List of matching trace records.
     """
-    service = TraceService(session)
+    service = _service(session)
     return await service.list_traces(
         run_id=run_id, span_type=span_type, limit=limit, offset=offset
     )
@@ -116,7 +152,7 @@ async def list_traces(
 async def ingest_shared_spans(
     spans: list[SharedSpanIngest],
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> list[Trace]:
     """Ingest spans in the canonical ``shared_core.tracing.Span`` shape.
 
@@ -132,9 +168,17 @@ async def ingest_shared_spans(
     Returns:
         The created trace records.
     """
-    service = TraceService(session)
+    service = _service(session)
     trace_creates = [span_to_trace_create(s) for s in spans]
     traces = await service.ingest_spans(trace_creates)
+    await evaluate_rules(session)
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="trace.canonical_ingest",
+        resource="traces",
+        details={"count": len(traces)},
+    )
     for trace in traces:
         await _broadcast(trace)
     return traces
@@ -144,7 +188,7 @@ async def ingest_shared_spans(
 async def ingest_cost_records(
     records: list[CostRecordIngest],
     session: AsyncSession = Depends(get_session),
-    current_user: User | None = Depends(get_optional_user),
+    current_user: User = Depends(require_roles(Role.INGESTOR, Role.ADMIN)),  # noqa: B008
 ) -> list[Trace]:
     """Ingest LCM-style ``shared_core.tracing.CostRecord`` payloads.
 
@@ -159,9 +203,17 @@ async def ingest_cost_records(
     Returns:
         The created trace records.
     """
-    service = TraceService(session)
+    service = _service(session)
     trace_creates = [cost_record_to_trace_create(r) for r in records]
     traces = await service.ingest_spans(trace_creates)
+    await evaluate_rules(session)
+    await record_audit(
+        session,
+        actor=current_user.username,
+        action="cost.ingest",
+        resource="traces",
+        details={"count": len(traces)},
+    )
     for trace in traces:
         await _broadcast(trace)
     return traces
@@ -171,6 +223,7 @@ async def ingest_cost_records(
 async def get_trace(
     trace_id: str,
     session: AsyncSession = Depends(get_session),
+    _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> Trace:
     """Get a specific trace by its ID.
 
@@ -184,7 +237,7 @@ async def get_trace(
     Raises:
         HTTPException: If the trace is not found.
     """
-    service = TraceService(session)
+    service = _service(session)
     trace = await service.get_trace(trace_id)
 
     if trace is None:

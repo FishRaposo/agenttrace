@@ -2,96 +2,85 @@
 
 ## What This Is
 
-AgentTrace is an observability + deterministic-replay layer for agentic AI workflows.
-Three deployable parts: an installable **tracing SDK**, a **FastAPI collector server**,
-and a **Next.js dashboard**. Migrated out of `General Projects/` onto the `shared_core`
-standard (server only — the SDK stays standalone).
+AgentTrace is an observability and deterministic-replay layer for agentic AI
+workflows. It has three deployables: a standalone tracing SDK, a self-contained
+FastAPI collector, and a Next.js dashboard.
 
-## Layout (three-part)
+## Layout
 
 ```
 agenttrace/
-├── sdk/                          # installable Python package `agenttrace` — STANDALONE
-│   ├── agenttrace/               #   tracer, span, exporters, instrumentation, wrappers,
-│   │                             #   cost_tracker, hybrid_client, distributed
-│   ├── tests/                    #   standalone SDK test suite
-│   └── pyproject.toml            #   must NOT depend on shared_core (pip-installable on its own)
-├── server/                       # FastAPI collector — shared_core-backed
-│   ├── app/
-│   │   ├── main.py               #   app wiring (shared_core middleware + rate limit + error handler)
-│   │   ├── config.py             #   Settings(BaseAppConfig)
-│   │   ├── core/logging.py       #   delegates to shared_core.logging
-│   │   ├── db/__init__.py        #   AsyncDatabaseManager engine + local DeclarativeBase
-│   │   ├── api/                  #   12 routers (traces, runs, stats, costs, budgets, alerts,
-│   │   │                         #     diff, replay, realtime WS, stream SSE, health, auth)
-│   │   ├── models/  services/  auth.py  # cost_reporting is server-only
-│   ├── tests/                    #   server API/service test suite
-│   ├── migrations/  Dockerfile  pyproject.toml  requirements.txt
-├── dashboard/                    # Next.js 14 + recharts — KEPT as-is
-├── examples/run_demo.py          # offline SDK tracing demo (JSONL export)
-├── scripts/  data/  docs/
-├── docker-compose.yml            # agenttrace_postgres + agenttrace_redis + server + dashboard
-├── Makefile  ruff.toml  pyrightconfig.json
+├── sdk/                          # installable package `agenttrace` — standalone
+├── server/                       # FastAPI collector and internal compatibility layer
+│   ├── app/internal/vendor_core/ # pinned server-only vendor subset
+│   ├── app/api/                  # traces, runs, costs, alerts, OTLP, replay, realtime
+│   ├── app/models/ services/     # persistence and domain logic
+│   ├── tests/                    # API and service tests
+│   └── migrations/ Dockerfile pyproject.toml requirements.txt
+├── dashboard/                    # Next.js dashboard with offline demo fixtures
+├── examples/ scripts/ docs/      # demos, evidence tooling, and project documentation
+├── Makefile ruff.toml pyrightconfig.json
 └── .github/workflows/ci.yml
 ```
 
-## The SDK is standalone (do not change this)
+## SDK boundary
 
-`sdk/agenttrace` is the product's core value and is published independently. It **must not
-import `shared_core`** so it stays a lightweight `pip install agenttrace`. Optional
-integrations (openai/anthropic/langchain/llamaindex/fastapi) are imported lazily as
-availability probes (`# noqa: F401`). The instrumentation modules import `Tracer` from
-`agenttrace.tracer` (not `agenttrace`) to avoid a package-init import cycle.
+`sdk/agenttrace` is published independently and must not import server code. Its
+optional provider integrations remain lazy, and its local `CostTracker.PRICING`
+table is intentionally independent from server pricing.
 
-## shared-core adoption (server only)
+## Server boundary
 
-| Bespoke (server, before) | Now |
-|---|---|
-| `Settings(BaseSettings)` | `Settings(BaseAppConfig)` (keeps domain fields; sqlite default) |
-| `core/logging.py` (stdlib JSON) | delegates to `shared_core.logging.setup_logging` |
-| `core/rate_limit.py` (in-memory) | `shared_core.ratelimit.RateLimiter` + `RateLimitMiddleware` (in-memory fallback; Redis-ready) |
-| `db/__init__.py` engine | `shared_core.database.AsyncDatabaseManager` (keeps local `Base`, sqlite repair, demo seed) |
-| catch-all 500 handler only | + `shared_core.errors.application_error_handler` + `RequestLoggingMiddleware` (correlation IDs) |
+The server owns the compatibility layer under `server/app/internal/`. It vendors
+only the modules needed for configuration, database access, errors, logging, rate
+limiting, tracing, LLM metrics, pricing, Redis helpers, and HTTP clients. Runtime
+imports must use the `app.internal` namespace. Do not add sibling checkouts,
+Git-installed dependencies, or runtime imports from an external compatibility
+package.
 
-**Preserved domain value:** the entire SDK; the server's replay + run-diff endpoints, WS
-streaming + SSE, `TraceService` run-stat math, JWT auth, cost-attribution columns,
-prompt-version cost filtering, and deterministic daily JSON/CSV cost reports.
+Canonical span and cost adapters accept dictionaries, Pydantic models, and
+compatible producer objects. Keep existing ingestion keys and compatibility
+aliases stable. Do not modify `aria-agent` for this integration.
 
 ## Commands
 
 ```bash
-make install      # pip install -e ../shared-core; pip install -e sdk; pip install -e 'server[dev]'; dashboard npm install
-make test         # sdk-test + server-test
+make install      # install SDK/server dev extras and dashboard with npm ci
+make test         # SDK + server tests
 make sdk-test     # standalone SDK tests
 make server-test  # server tests
-make lint         # ruff check server/app sdk/agenttrace examples ...
-make format       # ruff format ...
-make typecheck    # pyright server/app sdk/agenttrace
-make docker-up    # pgvector + redis + server + dashboard
-make demo         # offline SDK tracing demo (writes data/demo_traces.jsonl)
+make dashboard-test
+make lint         # Ruff check
+make format       # Ruff format
+make typecheck    # Pyright
+make evidence     # deterministic offline portfolio evidence
+make forbidden-scan
+make package      # build SDK and server wheels
+make docker-up    # optional PostgreSQL + Redis + server + dashboard
+make demo         # offline SDK tracing demo
 ```
 
-Local verification uses `.venv` at the repo root (shared-core editable + SDK editable +
-`server[dev]`). The SDK is verified standalone; the server with shared-core.
+The default path uses SQLite, in-memory realtime publication, bundled demo data,
+and no credentials or network-backed evaluations. Redis, PostgreSQL, Grafana, and
+real provider credentials are opt-in.
 
-## Current State
+## Delivered engineering surface
 
-The server adopts `shared_core` for config/logging/errors/DB, rate limiting, and server-side
-LLM metric rollups. Prompt versions remain trace metadata, so the standalone SDK and database
-schema do not gain a new dependency or field. The cost dashboard exposes prompt-version spend
-and daily report filtering. The last pre-port commit recorded 151 passing SDK/server tests; this
-checkout's new focused tests require the development dependencies described under Commands.
-Default DB is SQLite (`sqlite+aiosqlite`); compose uses Postgres.
+The server provides deterministic head/tail sampling, JSON OTLP resource/scope/
+event/link support, persisted cost and latency alerts, local `admin`/`ingestor`/
+`viewer` roles, redacted audit logs, optional Redis realtime transport, and a
+reproducible evidence fixture. Existing replay, run-diff, cost reporting,
+WebSocket/SSE, JWT, and SDK ingestion behavior remains compatible.
 
-## Follow-ups (not done now)
+## Deliberate product deferrals
 
-- Consolidate cost pricing: the server can converge on `shared_core.pricing`, but the SDK's
-  `CostTracker.PRICING` must stay SDK-local (the SDK can't import `shared_core`).
-- Let `aria-agent` (formerly hermes-agent-framework) emit `shared_core.tracing.Span` objects the collector ingests.
-- Server Docker image installs shared-core via its public git URL (workspace packaging gap).
+Hosted/team tenancy, external alert delivery and scheduling, OTLP protobuf/gRPC,
+and cross-repository changes remain deferred. Keep those boundaries explicit in
+roadmap and security documentation.
 
-## When to Update This AGENTS.md
+## When to update this file
 
-- SDK public API changes, or the SDK gains/loses a `shared_core` dependency (it must stay free)
-- Server shared-core adoption surface changes
-- Makefile targets, docker-compose services, or CI steps change
+- SDK public API or standalone dependency changes;
+- server compatibility, sampling, alert, RBAC, audit, or OTLP behavior changes;
+- Makefile targets, Docker Compose services, package metadata, or CI changes;
+- a new deferred boundary or provenance source is introduced.

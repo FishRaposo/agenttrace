@@ -11,7 +11,13 @@ from typing import Any
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 
+from app.config import settings
+from app.internal.realtime import RealtimePublisher, create_publisher
+
 router = APIRouter()
+publisher: RealtimePublisher = create_publisher(
+    settings.REALTIME_BACKEND, settings.REDIS_URL
+)
 
 # Store active connections
 connections: dict[str, list[WebSocket]] = {}
@@ -65,6 +71,8 @@ async def broadcast_trace(trace_data: dict[str, Any]) -> None:
         "data": trace_data,
     }
 
+    await publisher.publish("traces", message)
+
     disconnected = []
     for ws in connections.get("traces", []):
         try:
@@ -115,6 +123,8 @@ async def broadcast_metrics(metrics_data: dict[str, Any]) -> None:
         "data": metrics_data,
     }
 
+    await publisher.publish("metrics", message)
+
     disconnected = []
     for ws in connections.get("metrics", []):
         try:
@@ -139,3 +149,4 @@ async def close_all_connections() -> None:
             except Exception:
                 pass
         connections[channel].clear()
+    await publisher.close()

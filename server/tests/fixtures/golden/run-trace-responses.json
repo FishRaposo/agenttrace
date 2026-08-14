@@ -1,0 +1,43 @@
+{
+  "run": {
+    "id": "golden-run",
+    "correlation_id": null,
+    "name": "golden run",
+    "status": "completed",
+    "start_time": "2026-08-14T12:00:00+00:00",
+    "end_time": null,
+    "total_cost": 0.02,
+    "total_tokens": 2000,
+    "span_count": 1,
+    "metadata": null,
+    "workflow_id": null,
+    "feature": null
+  },
+  "trace": {
+    "id": "golden-trace-row",
+    "run_id": "golden-run",
+    "span_id": "golden-span",
+    "parent_span_id": null,
+    "span_type": "llm_call",
+    "name": "gpt-4",
+    "input_data": {"prompt": "Hello"},
+    "output_data": {"completion": "Hi there!"},
+    "metadata": {"prompt_version": "golden-v1"},
+    "start_time": "2026-08-14T12:00:00+00:00",
+    "end_time": null,
+    "duration_ms": 120.0,
+    "cost_usd": 0.02,
+    "token_usage": {
+      "prompt_tokens": 1000,
+      "completion_tokens": 1000,
+      "total_tokens": 2000
+    },
+    "status": "completed",
+    "error": null,
+    "model": "gpt-4o",
+    "provider": "openai",
+    "feature": "golden",
+    "sampled": true,
+    "sampling_reason": "sampling_disabled"
+  }
+}

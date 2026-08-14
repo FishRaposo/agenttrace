@@ -97,3 +97,64 @@ async def test_otlp_ingest_empty_request(client: AsyncClient) -> None:
     resp = await client.post("/api/otlp/v1/traces", json={"resourceSpans": []})
     assert resp.status_code == 200
     assert resp.json()["partialSuccess"]["acceptedSpans"] == 0
+
+
+@pytest.mark.asyncio
+async def test_otlp_ingest_preserves_resource_scope_events_and_links(
+    client: AsyncClient,
+) -> None:
+    response = await client.post(
+        "/api/otlp/v1/traces",
+        json={
+            "resourceSpans": [
+                {
+                    "resource": {
+                        "attributes": [
+                            {
+                                "key": "deployment.environment",
+                                "value": {"stringValue": "test"},
+                            }
+                        ]
+                    },
+                    "scopeSpans": [
+                        {
+                            "scope": {
+                                "name": "fixture.instrumentation",
+                                "version": "1.2.3",
+                            },
+                            "spans": [
+                                {
+                                    "traceId": "otlp-rich",
+                                    "spanId": "otlp-rich-span",
+                                    "name": "rich-span",
+                                    "startTimeUnixNano": "1700000000000000000",
+                                    "endTimeUnixNano": "1700000001000000000",
+                                    "events": [
+                                        {
+                                            "name": "cache.hit",
+                                            "timeUnixNano": "1700000000500000000",
+                                            "attributes": [],
+                                        }
+                                    ],
+                                    "links": [
+                                        {
+                                            "traceId": "linked-trace",
+                                            "spanId": "linked-span",
+                                        }
+                                    ],
+                                    "attributes": [],
+                                }
+                            ],
+                        }
+                    ],
+                }
+            ]
+        },
+    )
+
+    assert response.status_code == 200
+    stored = (await client.get("/api/traces?run_id=otlp-rich")).json()[0]
+    assert stored["metadata"]["otlp.resource.deployment.environment"] == "test"
+    assert stored["metadata"]["otlp.scope.name"] == "fixture.instrumentation"
+    assert stored["metadata"]["otlp.events"][0]["name"] == "cache.hit"
+    assert stored["metadata"]["otlp.links"][0]["traceId"] == "linked-trace"

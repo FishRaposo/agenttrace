@@ -36,3 +36,7 @@ htmlcov/
 .benchmarks/
 .commandcode/
 server.log
+artifacts/
+dashboard/tsconfig.tsbuildinfo
+dashboard/playwright-report/
+dashboard/test-results/

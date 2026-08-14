@@ -1,0 +1,27 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {"attributes": [{"key": "service.name", "value": {"stringValue": "agenttrace"}}]},
+      "scopeSpans": [
+        {
+          "scope": {"name": "agenttrace.collector", "version": "0.1.0"},
+          "spans": [
+            {
+              "traceId": "golden-run",
+              "spanId": "golden-span",
+              "name": "gpt-4",
+              "kind": 3,
+              "startTimeUnixNano": "1780000000000000000",
+              "endTimeUnixNano": "1780000000120000000",
+              "attributes": [
+                {"key": "agenttrace.span_type", "value": {"stringValue": "llm_call"}},
+                {"key": "agenttrace.sampled", "value": {"boolValue": true}}
+              ],
+              "status": {"code": 1}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

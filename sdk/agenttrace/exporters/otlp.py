@@ -6,16 +6,12 @@ import json
 import logging
 import os
 import time
+import urllib.request
 from typing import Any, Optional
 
-try:
-    import urllib.request
-
-    _HAS_URLLIB = True
-except ImportError:
-    _HAS_URLLIB = False
-
 from agenttrace.exporters.base import BaseExporter
+
+_HAS_URLLIB = True
 
 logger = logging.getLogger(__name__)
 
