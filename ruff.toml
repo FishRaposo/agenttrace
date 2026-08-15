@@ -17,6 +17,8 @@ ignore = []
 
 [lint.per-file-ignores]
 "scripts/*" = ["E501", "I001", "C901"]
+# conftest bootstraps sys.path for the repo-root `scripts/` package before imports.
+"server/tests/conftest.py" = ["E402"]
 
 [lint.flake8-bugbear]
 extend-immutable-calls = [
