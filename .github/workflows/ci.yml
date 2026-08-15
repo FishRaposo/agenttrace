@@ -122,7 +122,7 @@ jobs:
       - name: Install wheels in an isolated environment
         run: |
           python -m venv /tmp/agenttrace-wheel-venv
-          /tmp/agenttrace-wheel-venv/bin/pip install --no-deps sdk/dist/*.whl server/dist/*.whl
+          /tmp/agenttrace-wheel-venv/bin/pip install sdk/dist/*.whl server/dist/*.whl
           /tmp/agenttrace-wheel-venv/bin/python -c "import agenttrace; import app.main; import app.config; import app.db; import app.internal.vendor_core.pricing"
 
   docker-build:
