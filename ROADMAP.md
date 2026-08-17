@@ -19,6 +19,9 @@
 - Single-tenant `admin`, `ingestor`, and `viewer` roles plus redacted audit logs.
 - Portable Grafana dashboard JSON and a credential-free evidence bundle with
   golden output and SHA-256 verification.
+- Dependency-free, safety-bounded issue-to-draft-PR SDK workflow with
+  deterministic providers, sandbox/Git/test guards, approval, draft-only intent,
+  ordered audit/trace events, and replay.
 - Clean SDK/server wheel install paths, Ruff/Pyright gates, frontend CI,
   dependency scans, and provenance/attribution documentation.
 
@@ -31,6 +34,7 @@ requirements:
 - Slack, Discord, webhook, or other external notification delivery;
 - OTLP protobuf/gRPC;
 - mandatory Redis, PostgreSQL, Grafana, or a hosted database;
+- live GitHub/LLM/persistence/worker adapters and server-hosted issue-to-PR routes;
 - cross-repository changes to `aria-agent`.
 
 ## Future evidence-gated work

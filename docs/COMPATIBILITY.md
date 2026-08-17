@@ -5,6 +5,11 @@ dependency-light and independently installable. The FastAPI server owns its
 compatibility layer under `server/app/internal/` and its vendored infrastructure
 subset under `server/app/internal/vendor_core/`.
 
+`agenttrace.issue_pr` is additive inside the SDK. Importing `agenttrace` keeps the
+existing top-level exports and behavior unchanged; callers opt in with
+`agenttrace.issue_pr`. No server route, ingestion key, span vocabulary, cost
+calculation, exporter, or default behavior changed with the absorption.
+
 ## Canonical payloads
 
 `CanonicalSpan` and `CanonicalCostRecord` accept dictionaries, Pydantic models,
@@ -33,6 +38,11 @@ The checked-in contract set is under
 `alert-decisions.json`, `auth-database.json`, `otlp-response.json`, and
 `dashboard-demo.json`. `test_golden_fixtures.py` keeps the set parseable and
 ensures the public response sections remain present.
+
+The SDK issue/PR tests pin deterministic issue/plan serialization, sandbox and
+symlink refusal, protected branches, bounded `shell=False` tests, approval and
+draft-only behavior, audit ordering/redaction, provider-absent offline behavior,
+and replay. The portfolio evidence fixture adds a normalized end-to-end scenario.
 
 ## Provenance
 

@@ -42,3 +42,12 @@ boundaries rather than hidden dependencies.
 The offline evidence bundle and golden fixture are the regression gate for
 portfolio-facing changes. It records canonical trace/cost behavior, OTLP
 metadata, sampling, realtime, alert, RBAC, audit, and replay-shaped output.
+
+## Absorb issue-to-PR safety into the SDK
+
+The reusable safety core from `github-issue-pr-agent` belongs in the standalone
+SDK, not in a second server product. The port keeps provider protocols,
+deterministic mocks, sandbox/Git/test guards, approval, draft-only intent, audit,
+and replay, while rejecting the source server and external `shared_core`
+dependency. The full source mapping and rejected alternatives are recorded in
+the dated decision record.

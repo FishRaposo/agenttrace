@@ -98,6 +98,24 @@ tracer.set_exporter(APIExporter(
 ))
 ```
 
+## Safety-bounded issue-to-draft-PR workflow
+
+`agenttrace.issue_pr` is an additive, dependency-free SDK package absorbed from
+the former `github-issue-pr-agent` project. It provides provider-neutral issue and
+planning protocols, exact sandbox edits, protected-branch guards, shell-free
+bounded test execution, explicit approval state, a draft-only sink protocol,
+ordered redacted audit events, AgentTrace event forwarding, and deterministic
+run/audit replay.
+
+The included `StaticIssueSource`, `DeterministicPlanProvider`, and
+`RecordingDraftPullRequestSink` are offline adapters. `IssuePRWorkflow.process()`
+stops at `awaiting_approval`; `approve()` is the only path to the draft sink.
+The SDK never merges, refuses `main`/`master` mutations, and does not import or
+contact GitHub by default.
+
+GitHub REST, LLM planning, PostgreSQL, Redis, Celery, GitPython, and PyGithub
+adapters are intentionally outside the default package path.
+
 ## Exporter Options
 
 ### JSONLExporter

@@ -1,5 +1,15 @@
 # Changelog
 
+## 2026-08-16 — issue-to-draft-PR safety absorption
+
+- added the dependency-free `agenttrace.issue_pr` SDK package with deterministic
+  providers, sandbox/Git/test guards, explicit approval, draft-only intent,
+  ordered audit/trace events, redaction, and replay;
+- extended the offline evidence bundle and verifier with the absorbed workflow,
+  normalized golden output, exact file/checksum coverage, and corruption tests;
+- recorded the `github-issue-pr-agent@01a2404` lineage and source mapping while
+  keeping live providers, server routes, and hosted automation deferred.
+
 ## 2026-08-14 — browser gate stabilization
 
 - serialized the Playwright workers because the offline demo fixtures and Next

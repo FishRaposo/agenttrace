@@ -43,6 +43,10 @@ the API is unavailable.
 - Dependency-free Python SDK (`sdk/`) with decorators, context-managed runs,
   JSONL/API exporters, provider wrappers, replay payloads, and deterministic
   cost tracking. The SDK can be installed without the server.
+- Safety-bounded `agenttrace.issue_pr` SDK workflow with deterministic mock
+  issue/planner providers, sandbox-contained edits, protected-branch guards,
+  bounded shell-free tests, ordered audit/trace events, replay, and an explicit
+  pause before any draft-PR intent. Offline mode makes no GitHub call.
 - FastAPI collector (`server/`) with SQLite by default, optional PostgreSQL,
   canonical span/cost adapters, cost reports, run diffing, replay, and a JSON
   subset of OTLP HTTP traces.
@@ -59,7 +63,7 @@ the API is unavailable.
   for cost, latency, throughput, errors, and sampling.
 - A reproducible evidence bundle with canonical JSON, Markdown explanation,
   manifest hashes, realtime publication, sampling, alert, RBAC, audit, and
-  replay coverage.
+  replay plus issue-to-draft-PR safety coverage.
 
 ## Architecture
 
@@ -115,6 +119,11 @@ ruff format --check server/app sdk/agenttrace server/tests sdk/tests
 pyright server/app sdk/agenttrace
 ```
 
+The absorption branch currently executes 132 SDK tests and 98 server tests. The
+dashboard surface is unchanged; its previously verified 24-test result remains
+the applicable frontend baseline until the portfolio-wide clean-environment gate
+is rerun.
+
 ## SDK example
 
 ```python
@@ -137,6 +146,12 @@ print(answer.content)
 Provider wrappers and manual decorators are documented in
 [`docs/SDK.md`](docs/SDK.md). Simulation is deterministic; real providers are
 opt-in and require their own credentials.
+
+The issue-to-draft-PR workflow is additive and does not add server routes or
+change the existing span, cost, exporter, or ingestion contracts. Its default
+providers are deterministic and in-process. GitHub REST, LLM planning,
+PostgreSQL, Redis, Celery, GitPython, and PyGithub adapters remain optional
+integration work and are not imported by the default SDK path.
 
 ## HTTP surface
 
@@ -185,7 +200,10 @@ Grafana are optional integration surfaces, never default requirements.
 
 `make evidence` runs the fixed SQLite/in-memory scenario, including canonical
 ingestion, OTLP metadata, sampling, cost attribution, alert state, RBAC,
-redaction, replay-shaped output, and realtime publication. It writes:
+redaction, replay-shaped output, realtime publication, and a dependency-free
+issue-to-draft-PR scenario. That scenario proves path and protected-branch
+refusals, failing/passing test transitions, approval pause, draft-only intent,
+ordered events, replay, and redaction without network access. It writes:
 
 - `manifest.json` with mode, result hash, and reproducibility hash;
 - canonical `report.json` and human-readable `report.md`;
@@ -203,7 +221,8 @@ This repository delivers the local engineering core while keeping the default
 path inspectable and reproducible. Hosted/team tenancy, hosted scheduling,
 Slack/Discord/webhook delivery, external notification services, OTLP
 protobuf/gRPC, and mandatory Redis/PostgreSQL/Grafana services remain deferred.
-No changes are required in `aria-agent` or any other repository.
+Live GitHub/LLM providers and server-hosted issue-to-PR automation are also
+deferred. No changes are required in `aria-agent` or any other repository.
 
 ## License and provenance
 
@@ -212,3 +231,5 @@ subset is documented, attributed, and pinned in
 [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). See
 [`docs/decisions/2026-08-14-agenttrace-local-core.md`](docs/decisions/2026-08-14-agenttrace-local-core.md)
 for the compatibility and pricing boundary decision.
+The absorbed issue-to-draft-PR capability and source mapping are recorded in
+[`docs/decisions/2026-08-16-issue-pr-agent-absorption.md`](docs/decisions/2026-08-16-issue-pr-agent-absorption.md).

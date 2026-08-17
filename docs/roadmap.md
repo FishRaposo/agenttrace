@@ -16,6 +16,8 @@ explicitly bounded:
 | RBAC and redacted audit | Delivered locally | `docs/RBAC_AUDIT.md`, role-matrix tests |
 | Grafana artifact | Delivered locally | `monitoring/grafana/agenttrace-overview.json` |
 | Reproducible evidence | Delivered | `docs/EVIDENCE.md`, `make evidence` |
+| Safety-bounded issue-to-draft-PR SDK | Delivered locally | `agenttrace.issue_pr`, SDK tests, evidence fixture |
+| Live issue/PR providers and server routes | Deferred | GitHub/LLM/database/worker integrations remain optional |
 | Hosted/team workflows | Deferred | Product scope, no hosted service |
 | External notification/scheduling | Deferred | Local memory/log sinks only |
 | OTLP protobuf/gRPC | Deferred | JSON-only contract |

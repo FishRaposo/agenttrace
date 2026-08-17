@@ -123,7 +123,7 @@ jobs:
         run: |
           python -m venv /tmp/agenttrace-wheel-venv
           /tmp/agenttrace-wheel-venv/bin/pip install sdk/dist/*.whl server/dist/*.whl
-          /tmp/agenttrace-wheel-venv/bin/python -c "import agenttrace; import app.main; import app.config; import app.db; import app.internal.vendor_core.pricing"
+          /tmp/agenttrace-wheel-venv/bin/python -c "import agenttrace; import agenttrace.issue_pr; import agenttrace.issue_pr.audit; import agenttrace.issue_pr.commands; import agenttrace.issue_pr.git; import agenttrace.issue_pr.mock; import agenttrace.issue_pr.models; import agenttrace.issue_pr.protocols; import agenttrace.issue_pr.safety; import agenttrace.issue_pr.workflow; import app.main; import app.config; import app.db; import app.internal.vendor_core.pricing"
 
   docker-build:
     name: Docker Build Verify

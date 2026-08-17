@@ -24,7 +24,21 @@ def main() -> int:
     server_wheels = sorted(Path("server/dist").glob("*.whl"))
     if not sdk_wheels or not server_wheels:
         raise SystemExit("build SDK and server wheels before checking their contents")
-    check_wheel(sdk_wheels[-1], ("agenttrace/__init__.py",))
+    check_wheel(
+        sdk_wheels[-1],
+        (
+            "agenttrace/__init__.py",
+            "agenttrace/issue_pr/__init__.py",
+            "agenttrace/issue_pr/audit.py",
+            "agenttrace/issue_pr/commands.py",
+            "agenttrace/issue_pr/git.py",
+            "agenttrace/issue_pr/mock.py",
+            "agenttrace/issue_pr/models.py",
+            "agenttrace/issue_pr/protocols.py",
+            "agenttrace/issue_pr/workflow.py",
+            "agenttrace/issue_pr/safety.py",
+        ),
+    )
     check_wheel(
         server_wheels[-1],
         (
@@ -34,7 +48,9 @@ def main() -> int:
             "app/internal/vendor_core/tracing.py",
         ),
     )
-    print("wheel contents: self-contained SDK and vendored server core present")
+    print(
+        "wheel contents: self-contained SDK, issue-PR workflow, and vendored server core present"
+    )
     return 0
 
 

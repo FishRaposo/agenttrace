@@ -11,6 +11,15 @@ transactions. The dashboard is a browser client and must not be treated as a
 trusted actor. Local SQLite and the optional PostgreSQL database are storage
 boundaries, not secret stores.
 
+The `agenttrace.issue_pr` SDK package treats issue text and plans as untrusted.
+Its editor resolves paths before authorization, rejects traversal and symlink
+escapes, applies allow/block policies, and protects secret/configuration paths.
+Git mutations reject `main`/`master`, invalid refs/remotes, and all merges. Test
+commands are exact argv allowlist entries executed with `shell=False` and a
+finite timeout. A passing run stops at `awaiting_approval`; approval is required
+before a draft-only sink can be invoked. The bundled sink records intent in
+memory and performs no network request.
+
 ## Authentication and roles
 
 Passwords are bcrypt-hashed and JWT bearer tokens expire according to
@@ -49,6 +58,10 @@ protected by the same network/auth controls as the rest of the API.
 - Use Redis only when multi-worker realtime/rate-limit coordination is needed.
 - Redact sensitive payloads before exporting traces or publishing evidence.
 - Keep Grafana and evidence artifacts behind the same access controls as traces.
+- Keep issue/PR GitHub and planner providers opt-in; review their credentials,
+  repository permissions, and approval integration before enabling them.
 
 Hosted tenancy, external notification delivery, and hosted scheduling are not
-implemented in this repository and are not implied by local RBAC.
+implemented in this repository and are not implied by local RBAC. Live GitHub
+PR creation, LLM planning, distributed workers, and server issue/PR routes are
+not offline capabilities.

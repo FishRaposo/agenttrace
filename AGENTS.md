@@ -27,7 +27,10 @@ agenttrace/
 
 `sdk/agenttrace` is published independently and must not import server code. Its
 optional provider integrations remain lazy, and its local `CostTracker.PRICING`
-table is intentionally independent from server pricing.
+table is intentionally independent from server pricing. The dependency-free
+`agenttrace.issue_pr` package owns the absorbed, safety-bounded issue-to-draft-PR
+workflow. It must stop at explicit approval, remain draft-only, and never make a
+network call through its default adapters.
 
 ## Server boundary
 
@@ -66,7 +69,9 @@ real provider credentials are opt-in.
 
 ## Delivered engineering surface
 
-The server provides deterministic head/tail sampling, JSON OTLP resource/scope/
+The SDK provides a deterministic issue-to-plan workflow, sandbox-contained edits,
+protected-branch and bounded-test guards, ordered audit/trace events, replay, and a
+draft-only approval boundary. The server provides deterministic head/tail sampling, JSON OTLP resource/scope/
 event/link support, persisted cost and latency alerts, local `admin`/`ingestor`/
 `viewer` roles, redacted audit logs, optional Redis realtime transport, and a
 reproducible evidence fixture. Existing replay, run-diff, cost reporting,
@@ -75,8 +80,9 @@ WebSocket/SSE, JWT, and SDK ingestion behavior remains compatible.
 ## Deliberate product deferrals
 
 Hosted/team tenancy, external alert delivery and scheduling, OTLP protobuf/gRPC,
-and cross-repository changes remain deferred. Keep those boundaries explicit in
-roadmap and security documentation.
+real GitHub/LLM/persistence/worker providers for issue-to-PR automation, and
+server routes for that workflow remain deferred. Keep those boundaries explicit
+in roadmap and security documentation.
 
 ## When to update this file
 
