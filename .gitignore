@@ -40,3 +40,4 @@ artifacts/
 dashboard/tsconfig.tsbuildinfo
 dashboard/playwright-report/
 dashboard/test-results/
+/.superpowers/sdd/
