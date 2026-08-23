@@ -1,5 +1,5 @@
 [build-system]
-requires = ["setuptools>=68.0", "wheel"]
+requires = ["setuptools>=84.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=7.0", "pytest-cov", "mypy", "ruff", "pyright>=1.1.390"]
+dev = ["pytest>=9.1.1", "pytest-cov", "mypy", "ruff", "pyright>=1.1.411"]
 
 [tool.setuptools.packages.find]
 include = ["agenttrace*"]
