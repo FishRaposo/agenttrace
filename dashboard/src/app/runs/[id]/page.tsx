@@ -2,15 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
+import { GitCompare, Play, X } from "lucide-react";
 import type { Run, TraceResponse, RunStatus } from "@/types";
-import { fetchRun, fetchRunSpans } from "@/lib/api";
+import { fetchRun, fetchRunSpans, fetchRuns } from "@/lib/api";
+import { DEMO_COMPARE_TARGET_ID } from "@/lib/demoData";
 import { RunTimeline } from "@/components/RunTimeline";
 import { SpanDetail } from "@/components/SpanDetail";
 import { CostBreakdown } from "@/components/CostBreakdown";
 import { TokenUsage } from "@/components/TokenUsage";
 import { RunDiff } from "@/components/RunDiff";
 import { PromptReplay } from "@/components/PromptReplay";
-import { fetchRuns } from "@/lib/api";
 
 function StatusBadge({ status }: { status: RunStatus }): JSX.Element {
   const classes: Record<RunStatus, string> = {
@@ -40,9 +41,11 @@ export default function RunDetailPage(): JSX.Element {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<"spans" | "compare" | "replay">("spans");
-  const [compareRunId, setCompareRunId] = useState<string>("");
+  const [compareRunId, setCompareRunId] = useState<string>(DEMO_COMPARE_TARGET_ID);
   const [otherRuns, setOtherRuns] = useState<Run[]>([]);
   const [loadingOtherRuns, setLoadingOtherRuns] = useState(false);
+  const [showReplayPanel, setShowReplayPanel] = useState(false);
+  const [showDiffPanel, setShowDiffPanel] = useState(false);
 
   useEffect(() => {
     if (!runId) return;
@@ -108,12 +111,45 @@ export default function RunDetailPage(): JSX.Element {
     );
   }
 
+  const defaultCompareId =
+    runId === DEMO_COMPARE_TARGET_ID ? "demo-run-005" : DEMO_COMPARE_TARGET_ID;
+  const diffCompareId = compareRunId || defaultCompareId;
+
   return (
     <div>
       <div className="mb-8">
-        <div className="flex items-center gap-3 mb-2">
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{run.name}</h2>
-          <StatusBadge status={run.status} />
+        <div className="flex flex-wrap items-start justify-between gap-4 mb-2">
+          <div className="flex items-center gap-3">
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">{run.name}</h2>
+            <StatusBadge status={run.status} />
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              data-testid="run-replay-action"
+              onClick={() => {
+                setShowReplayPanel(true);
+                setActiveTab("replay");
+              }}
+              className="inline-flex items-center gap-2 rounded-lg bg-trace-600 px-4 py-2 text-sm font-medium text-white hover:bg-trace-700 transition-colors"
+            >
+              <Play className="h-4 w-4" />
+              Replay
+            </button>
+            <button
+              type="button"
+              data-testid="run-diff-action"
+              onClick={() => {
+                if (!compareRunId) setCompareRunId(defaultCompareId);
+                setShowDiffPanel(true);
+                setActiveTab("compare");
+              }}
+              className="inline-flex items-center gap-2 rounded-lg border border-gray-300 bg-white px-4 py-2 text-sm font-medium text-gray-900 hover:bg-gray-50 dark:border-gray-700 dark:bg-gray-900 dark:text-white dark:hover:bg-gray-800 transition-colors"
+            >
+              <GitCompare className="h-4 w-4" />
+              Diff
+            </button>
+          </div>
         </div>
         <div className="flex gap-6 text-sm text-gray-500 flex-wrap">
           <span>Started: {formatDate(run.start_time)}</span>
@@ -121,8 +157,65 @@ export default function RunDetailPage(): JSX.Element {
           <span>Cost: {formatCost(run.total_cost)}</span>
           <span>Tokens: {run.total_tokens.toLocaleString()}</span>
           <span>Spans: {run.span_count}</span>
+          {run.metadata?.workflow === "issue_pr" && (
+            <span className="text-amber-700 dark:text-amber-300">
+              Issue-to-PR trace — draft-only, no GitHub call
+            </span>
+          )}
         </div>
       </div>
+
+      {showReplayPanel && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 sm:p-8"
+          role="dialog"
+          aria-label="Replay panel"
+          data-testid="run-replay-panel"
+        >
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-950 shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Replay</h3>
+              <button
+                type="button"
+                onClick={() => setShowReplayPanel(false)}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Close replay panel"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <PromptReplay runId={runId} />
+            </div>
+          </div>
+        </div>
+      )}
+
+      {showDiffPanel && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 p-4 sm:p-8"
+          role="dialog"
+          aria-label="Diff panel"
+          data-testid="run-diff-panel"
+        >
+          <div className="w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-xl bg-white dark:bg-gray-950 shadow-xl">
+            <div className="sticky top-0 flex items-center justify-between border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950 px-4 py-3">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Run diff</h3>
+              <button
+                type="button"
+                onClick={() => setShowDiffPanel(false)}
+                className="rounded-lg p-2 text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-800"
+                aria-label="Close diff panel"
+              >
+                <X className="h-5 w-5" />
+              </button>
+            </div>
+            <div className="p-4">
+              <RunDiff runId1={runId} runId2={diffCompareId} />
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2">

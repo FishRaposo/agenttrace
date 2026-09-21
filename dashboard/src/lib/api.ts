@@ -17,7 +17,7 @@ import type {
   BudgetStatus,
   DailyCostReport,
 } from "@/types";
-import { demoResponseFor } from "@/lib/demoData";
+import { demoIssuePrSpans, demoResponseFor, demoSpans } from "@/lib/demoData";
 
 const API_BASE_URL: string =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
@@ -34,6 +34,11 @@ const demoListeners = new Set<(active: boolean) => void>();
 /** Returns true when the dashboard is serving demo fixtures. */
 export function isDemoMode(): boolean {
   return demoMode;
+}
+
+/** Returns true when demo mode is forced via NEXT_PUBLIC_DEMO_MODE=1. */
+export function isDemoForced(): boolean {
+  return DEMO_FORCED;
 }
 
 /** Subscribe to demo-mode changes; returns an unsubscribe function. */
@@ -200,6 +205,22 @@ export async function fetchBudgetStatus(budgetId: string): Promise<BudgetStatus>
 
 // Live tail (SSE)
 export function streamTraces(callback: (trace: TraceResponse) => void): () => void {
+  if (demoMode || DEMO_FORCED) {
+    const pool = [...demoIssuePrSpans, ...demoSpans].slice(0, 12);
+    let index = 0;
+    const timer = window.setInterval(() => {
+      const span = pool[index % pool.length];
+      callback({
+        ...span,
+        id: `${span.id}-live-${index}`,
+        start_time: new Date().toISOString(),
+        end_time: new Date().toISOString(),
+      });
+      index += 1;
+    }, 1800);
+    return () => window.clearInterval(timer);
+  }
+
   const url = `${API_BASE_URL}/api/stream/traces`;
   const eventSource = new EventSource(url);
 
@@ -214,6 +235,7 @@ export function streamTraces(callback: (trace: TraceResponse) => void): () => vo
 
   eventSource.onerror = () => {
     eventSource.close();
+    setDemoMode(true);
   };
 
   return () => eventSource.close();

@@ -38,6 +38,23 @@ The API is available at `http://localhost:8000/docs` and the dashboard at
 `http://localhost:3000`. The dashboard has an explicit offline demo mode when
 the API is unavailable.
 
+### Portfolio demo (dashboard only, no backend)
+
+For reviewers who only need the UI — deterministic fixtures, no server, no
+credentials:
+
+```bash
+make demo-ui
+# or: cd dashboard && npm run demo:ui
+```
+
+Open `http://localhost:3000`. The banner reads **Sample data — deterministic
+fixtures for portfolio review.** Start with **`demo-run-005`**
+(`issue-to-draft-pr`): a safety-bounded issue-to-draft-PR trace with replay and
+diff actions at the top of the run detail page. Costs and Live Tail work from the
+same fixture set. Runs remain inspectable after the fact — replay steps and diff
+panels use the same deterministic data the evidence bundle exercises offline.
+
 ## What is delivered
 
 - Dependency-free Python SDK (`sdk/`) with decorators, context-managed runs,
@@ -104,6 +121,7 @@ Useful targets:
 | `make lint` | Ruff checks |
 | `make format` | Ruff formatting |
 | `make typecheck` | Pyright for SDK and server |
+| `make demo-ui` | Dashboard in forced portfolio demo mode (no backend) |
 | `make evidence` | Build and verify the offline evidence bundle |
 | `make forbidden-scan` | Check for retired external dependency references |
 | `make package` | Build both Python wheels |

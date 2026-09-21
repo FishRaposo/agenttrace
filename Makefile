@@ -1,7 +1,7 @@
 PYTHON := python
 NPM    := npm
 
-.PHONY: install dev test sdk-test server-test dashboard-test lint format typecheck \
+.PHONY: install dev demo-ui test sdk-test server-test dashboard-test lint format typecheck \
         evidence forbidden-scan package docker-up docker-down demo clean help
 
 install: ## Install the SDK, self-contained server, and dashboard deps
@@ -11,6 +11,9 @@ install: ## Install the SDK, self-contained server, and dashboard deps
 
 dev: ## Run the collector server locally (uvicorn on :8000)
 	cd server && uvicorn app.main:app --reload --port 8000
+
+demo-ui: ## Run the dashboard in forced portfolio demo mode (no backend)
+	cd dashboard && $(NPM) run demo:ui
 
 test: sdk-test server-test ## Run SDK + server test suites
 

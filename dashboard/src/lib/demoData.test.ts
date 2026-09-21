@@ -3,7 +3,7 @@ import {
   demoResponseFor,
   demoRuns,
   demoStats,
-  demoSpans,
+  demoSpansForRun,
   demoReplay,
   demoRunDiff,
 } from "@/lib/demoData";
@@ -55,13 +55,38 @@ describe("demoResponseFor", () => {
   it("returns undefined for an unmapped path", () => {
     expect(demoResponseFor("/api/nonexistent")).toBeUndefined();
   });
+
+  it("resolves the issue-to-pr showcase run", () => {
+    const run = demoResponseFor("/api/runs/demo-run-005") as { id: string; name: string };
+    expect(run).toMatchObject({ id: "demo-run-005", name: "issue-to-draft-pr" });
+  });
+
+  it("resolves spans for the issue-to-pr run", () => {
+    const spans = demoResponseFor("/api/runs/demo-run-005/spans") as { name: string }[];
+    expect(spans.some((s) => s.name === "draft-pr-intent")).toBe(true);
+  });
+
+  it("resolves run diff queries", () => {
+    const diff = demoResponseFor(
+      "/api/diff/runs?run_id_1=demo-run-005&run_id_2=demo-run-001"
+    ) as { run1: { id: string }; run2: { id: string } };
+    expect(diff.run1.id).toBe("demo-run-005");
+    expect(diff.run2.id).toBe("demo-run-001");
+  });
+
+  it("resolves budget status", () => {
+    const status = demoResponseFor("/api/budgets/demo-budget-1/status") as {
+      budget_id: string;
+    };
+    expect(status.budget_id).toBe("demo-budget-1");
+  });
 });
 
 describe("demo derived helpers", () => {
   it("builds a replay payload from a run", () => {
     const replay = demoReplay(demoRuns[0]);
     expect(replay.run.id).toBe(demoRuns[0].id);
-    expect(replay.total_steps).toBe(demoSpans.length);
+    expect(replay.total_steps).toBe(demoSpansForRun(demoRuns[0].id).length);
   });
 
   it("builds a run diff with computed differences", () => {

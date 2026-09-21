@@ -77,6 +77,25 @@ export const demoRuns: Run[] = [
     span_count: 47,
     metadata: { agent: "batch", env: "demo" },
   },
+  {
+    id: "demo-run-005",
+    correlation_id: "wf-issue-pr",
+    name: "issue-to-draft-pr",
+    status: "completed",
+    start_time: isoOffset(-5),
+    end_time: isoOffset(-4),
+    total_cost: 0.0186,
+    total_tokens: 6240,
+    span_count: 7,
+    metadata: {
+      workflow: "issue_pr",
+      issue: "#142",
+      repo: "acme/widget",
+      draft_only: true,
+      github_call: false,
+      env: "demo",
+    },
+  },
 ];
 
 export const demoStats: Stats = {
@@ -85,6 +104,146 @@ export const demoStats: Stats = {
   total_tokens: demoRuns.reduce((s, r) => s + r.total_tokens, 0),
   avg_duration_ms: 842.5,
 };
+
+export const demoIssuePrSpans: TraceResponse[] = [
+  {
+    id: "demo-span-ip1",
+    run_id: "demo-run-005",
+    span_id: "ip-s1",
+    parent_span_id: null,
+    span_type: "decision",
+    name: "parse-issue",
+    input_data: { issue_number: 142, title: "Add retry backoff to webhook handler" },
+    output_data: { labels: ["bug", "reliability"], scope: "server/webhooks.py" },
+    metadata: { workflow: "issue_pr", phase: "intake" },
+    start_time: isoOffset(-5),
+    end_time: isoOffset(-5),
+    duration_ms: 18,
+    cost_usd: 0,
+    token_usage: null,
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip2",
+    run_id: "demo-run-005",
+    span_id: "ip-s2",
+    parent_span_id: "ip-s1",
+    span_type: "llm_call",
+    name: "plan-changes",
+    input_data: { model: "gpt-4o-mini", prompt_version: "issue-planner-v2" },
+    output_data: {
+      plan: ["add exponential backoff", "cap retries at 5", "unit test failure path"],
+      files: ["server/webhooks.py", "tests/test_webhooks.py"],
+    },
+    metadata: { feature: "issue_pr_planning", github_call: false },
+    start_time: isoOffset(-5),
+    end_time: isoOffset(-5),
+    duration_ms: 820,
+    cost_usd: 0.0124,
+    token_usage: { prompt_tokens: 2100, completion_tokens: 480, total_tokens: 2580 },
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip3",
+    run_id: "demo-run-005",
+    span_id: "ip-s3",
+    parent_span_id: "ip-s2",
+    span_type: "tool_call",
+    name: "sandbox-edit",
+    input_data: { sandbox: "tmp-worktree", files_touched: 2 },
+    output_data: { diff_lines: 47, contained: true },
+    metadata: { tool_name: "sandbox_editor", network: false },
+    start_time: isoOffset(-5),
+    end_time: isoOffset(-4.9),
+    duration_ms: 210,
+    cost_usd: 0,
+    token_usage: null,
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip4",
+    run_id: "demo-run-005",
+    span_id: "ip-s4",
+    parent_span_id: "ip-s3",
+    span_type: "decision",
+    name: "protected-branch-check",
+    input_data: { target_branch: "main", policy: "no-direct-push" },
+    output_data: { allowed: true, requires_pr: true },
+    metadata: { guard: "protected_branch" },
+    start_time: isoOffset(-4.9),
+    end_time: isoOffset(-4.9),
+    duration_ms: 6,
+    cost_usd: 0,
+    token_usage: null,
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip5",
+    run_id: "demo-run-005",
+    span_id: "ip-s5",
+    parent_span_id: "ip-s4",
+    span_type: "tool_call",
+    name: "run-bounded-tests",
+    input_data: { suite: "tests/test_webhooks.py", max_seconds: 30, shell_free: true },
+    output_data: { passed: 4, failed: 0, bounded: true },
+    metadata: { guard: "bounded_tests" },
+    start_time: isoOffset(-4.9),
+    end_time: isoOffset(-4.5),
+    duration_ms: 1240,
+    cost_usd: 0,
+    token_usage: null,
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip6",
+    run_id: "demo-run-005",
+    span_id: "ip-s6",
+    parent_span_id: "ip-s5",
+    span_type: "decision",
+    name: "approval-pause",
+    input_data: { reason: "draft_pr_intent", auto_approve: false },
+    output_data: { paused: true, awaiting: "human_approval" },
+    metadata: { safety_boundary: "explicit_approval" },
+    start_time: isoOffset(-4.5),
+    end_time: isoOffset(-4.5),
+    duration_ms: 4,
+    cost_usd: 0,
+    token_usage: null,
+    status: "completed",
+    error: null,
+  },
+  {
+    id: "demo-span-ip7",
+    run_id: "demo-run-005",
+    span_id: "ip-s7",
+    parent_span_id: "ip-s6",
+    span_type: "custom",
+    name: "draft-pr-intent",
+    input_data: {
+      title: "fix: retry backoff for webhook handler (#142)",
+      base: "main",
+      draft: true,
+    },
+    output_data: {
+      intent_recorded: true,
+      github_api_called: false,
+      pr_url: null,
+    },
+    metadata: { workflow: "issue_pr", phase: "draft_only" },
+    start_time: isoOffset(-4.5),
+    end_time: isoOffset(-4),
+    duration_ms: 12,
+    cost_usd: 0.0062,
+    token_usage: { prompt_tokens: 2800, completion_tokens: 860, total_tokens: 3660 },
+    status: "completed",
+    error: null,
+  },
+];
 
 export const demoSpans: TraceResponse[] = [
   {
@@ -145,7 +304,13 @@ export const demoSpans: TraceResponse[] = [
     status: "completed",
     error: null,
   },
+  ...demoIssuePrSpans,
 ];
+
+/** Spans indexed by run id for replay and timeline views. */
+export function demoSpansForRun(runId: string): TraceResponse[] {
+  return demoSpans.filter((s) => s.run_id === runId);
+}
 
 export const demoCostSummary: CostSummary = {
   total_cost: demoStats.total_cost,
@@ -272,16 +437,9 @@ export function demoRunDiff(run1: Run, run2: Run): RunDiff {
 }
 
 export function demoReplay(run: Run): ReplayData {
-  return {
-    run: {
-      id: run.id,
-      name: run.name,
-      status: run.status,
-      start_time: run.start_time,
-      end_time: run.end_time,
-      metadata: run.metadata,
-    },
-    steps: demoSpans.map((s) => ({
+  const spans = demoSpansForRun(run.id);
+  const steps = (spans.length > 0 ? spans : demoSpans.filter((s) => s.run_id === "demo-run-001")).map(
+    (s) => ({
       id: s.id,
       name: s.name,
       span_type: s.span_type,
@@ -292,10 +450,24 @@ export function demoReplay(run: Run): ReplayData {
       end_time: s.end_time,
       status: s.status,
       error: s.error,
-    })),
-    total_steps: demoSpans.length,
+    })
+  );
+  return {
+    run: {
+      id: run.id,
+      name: run.name,
+      status: run.status,
+      start_time: run.start_time,
+      end_time: run.end_time,
+      metadata: run.metadata,
+    },
+    steps,
+    total_steps: steps.length,
   };
 }
+
+/** Default compare target for portfolio showcase runs. */
+export const DEMO_COMPARE_TARGET_ID = "demo-run-001";
 
 /**
  * Resolve a demo response for a given API path. Returns ``undefined`` when no
@@ -347,6 +519,44 @@ export function demoResponseFor(path: string): unknown {
   }
   if (clean === "/api/budgets") return demoBudgets;
 
+  const budgetStatusMatch = clean.match(/^\/api\/budgets\/([^/]+)\/status$/);
+  if (budgetStatusMatch) {
+    return demoBudgetStatus;
+  }
+
+  const diffMatch = path.match(/^\/api\/diff\/runs\?/);
+  if (diffMatch) {
+    const params = new URLSearchParams(path.split("?")[1] ?? "");
+    const runId1 = params.get("run_id_1") ?? demoRuns[0].id;
+    const runId2 = params.get("run_id_2") ?? DEMO_COMPARE_TARGET_ID;
+    const run1 = demoRuns.find((r) => r.id === runId1) ?? demoRuns[0];
+    const run2 = demoRuns.find((r) => r.id === runId2) ?? demoRuns[1];
+    const diff = demoRunDiff(run1, run2);
+    if (run1.id === "demo-run-005" || run2.id === "demo-run-005") {
+      diff.spans = {
+        only_in_run1: run1.id === "demo-run-005"
+          ? [["draft-pr-intent", "custom"], ["approval-pause", "decision"]]
+          : [],
+        only_in_run2: run2.id === "demo-run-005"
+          ? [["draft-pr-intent", "custom"], ["approval-pause", "decision"]]
+          : [],
+        common_count: 3,
+        differences: [
+          {
+            name: "plan-changes",
+            span_type: "llm_call",
+            duration_diff: 280,
+            cost_diff: 0.008,
+            status_changed: false,
+            status_1: "completed",
+            status_2: "completed",
+          },
+        ],
+      };
+    }
+    return diff;
+  }
+
   if (clean === "/api/runs") {
     const response: RunListResponse = {
       runs: demoRuns,
@@ -360,7 +570,7 @@ export function demoResponseFor(path: string): unknown {
   // /api/runs/{id}/spans
   const spansMatch = clean.match(/^\/api\/runs\/([^/]+)\/spans$/);
   if (spansMatch) {
-    return demoSpans.filter((s) => s.run_id === spansMatch[1]);
+    return demoSpansForRun(spansMatch[1]);
   }
 
   // /api/runs/{id}

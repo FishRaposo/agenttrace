@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pause, Play, Radio } from "lucide-react";
-import { streamTraces } from "@/lib/api";
+import { isDemoMode, streamTraces } from "@/lib/api";
 import type { TraceResponse } from "@/types";
 
 function formatCost(c: number | null): string {
@@ -27,12 +27,14 @@ const SPAN_TYPE_COLOR: Record<string, string> = {
 export default function LivePage(): JSX.Element {
   const [traces, setTraces] = useState<TraceResponse[]>([]);
   const [paused, setPaused] = useState(false);
+  const [demoActive, setDemoActive] = useState(isDemoMode());
   const scrollRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (paused) return;
 
     const cleanup = streamTraces((trace) => {
+      setDemoActive(isDemoMode());
       setTraces((prev) => {
         const next = [trace, ...prev];
         return next.slice(0, 100);
@@ -66,6 +68,12 @@ export default function LivePage(): JSX.Element {
           {paused ? "Resume" : "Pause"}
         </button>
       </div>
+
+      {demoActive && (
+        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
+          Simulated live tail from deterministic demo fixtures.
+        </div>
+      )}
 
       {paused && (
         <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 text-sm text-amber-700">
