@@ -48,12 +48,14 @@ make demo-ui
 # or: cd dashboard && npm run demo:ui
 ```
 
-Open `http://localhost:3000`. The banner reads **Sample data — deterministic
-fixtures for portfolio review.** Start with **`demo-run-005`**
-(`issue-to-draft-pr`): a safety-bounded issue-to-draft-PR trace with replay and
-diff actions at the top of the run detail page. Costs and Live Tail work from the
-same fixture set. Runs remain inspectable after the fact — replay steps and diff
-panels use the same deterministic data the evidence bundle exercises offline.
+Open `http://localhost:3000`. The banner reads **Sample data — deterministic fixtures for portfolio review.**
+
+**Click path:**
+
+1. **Runs** → `demo-run-005` (`issue-to-draft-pr`) — span timeline with token use and cost on each step.
+2. **Replay** — deterministic step-through of the recorded run (draft-only, no GitHub call).
+3. **Diff** — compare against a second sample run to see what changed.
+4. **Costs** or **Live Tail** — attribution and tail from the same fixture set.
 
 ## What is delivered
 
