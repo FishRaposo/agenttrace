@@ -5,13 +5,14 @@ NPM    := npm
         evidence forbidden-scan package docker-up docker-down demo clean help
 
 install: ## Install the SDK, self-contained server, and dashboard deps from lockfiles
-	$(PYTHON) -m pip install -r sdk/requirements-lock.txt -r server/requirements-lock.txt
+	$(PYTHON) -m pip install -r server/requirements-lock.txt
 	$(PYTHON) -m pip install --no-deps -e sdk -e server
 	cd dashboard && $(NPM) ci
 
-lock: ## Regenerate the Python lockfiles (requires uv)
+lock: ## Regenerate the Python lockfiles (requires uv; keeps existing pins unless inconsistent)
 	cd sdk && uv pip compile pyproject.toml --extra dev --python-version 3.11 --universal -o requirements-lock.txt
 	cd server && uv pip compile pyproject.toml --extra dev --python-version 3.11 --universal -c ../sdk/requirements-lock.txt -o requirements-lock.txt
+	cd server && uv pip compile pyproject.toml --python-version 3.11 --universal -c requirements-lock.txt -o requirements.txt
 
 dev: ## Run the collector server locally (uvicorn on :8000)
 	cd server && uvicorn app.main:app --reload --port 8000
