@@ -13,8 +13,6 @@ export default defineConfig({
     setupFiles: ["./vitest.setup.ts"],
     include: ["src/**/*.test.{ts,tsx}"],
     css: false,
-    // Avoid fork-pool jsdom/webidl mismatches seen on GitHub Actions Node 20.
-    pool: "threads",
   },
   resolve: {
     alias: {
