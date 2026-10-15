@@ -1,32 +1,97 @@
 version: 2
 
+# Dependency policy (portfolio X7):
+# - minor and patch updates arrive as one grouped PR per ecosystem and directory;
+# - majors of the framework/toolchain packages below are ignored and migrated by
+#   hand (the 2026-09-25 grouped merge of Tailwind 4 + TypeScript 7 broke the
+#   dashboard build and lint);
+# - any other major arrives as its own PR so CI gates it individually.
+# Python installs in CI come from sdk/requirements-lock.txt and
+# server/requirements-lock.txt (regenerate with `make lock`).
+
 updates:
   - package-ecosystem: pip
     directory: /sdk
     schedule:
       interval: weekly
     groups:
-      pip-dependencies:
+      pip-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: pydantic
+        update-types: ["version-update:semver-major"]
+      - dependency-name: fastapi
+        update-types: ["version-update:semver-major"]
+      - dependency-name: sqlalchemy
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: pip
     directory: /server
     schedule:
       interval: weekly
     groups:
-      pip-dependencies:
+      pip-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: pydantic
+        update-types: ["version-update:semver-major"]
+      - dependency-name: pydantic-settings
+        update-types: ["version-update:semver-major"]
+      - dependency-name: fastapi
+        update-types: ["version-update:semver-major"]
+      - dependency-name: sqlalchemy
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: npm
     directory: /dashboard
     schedule:
       interval: weekly
     groups:
-      npm-dependencies:
+      npm-minor-patch:
         patterns:
           - "*"
+        update-types:
+          - minor
+          - patch
+    ignore:
+      - dependency-name: typescript
+        update-types: ["version-update:semver-major"]
+      - dependency-name: tailwindcss
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@tailwindcss/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: typescript-eslint
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@typescript-eslint/*"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: eslint-config-next
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react
+        update-types: ["version-update:semver-major"]
+      - dependency-name: react-dom
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: "@types/react-dom"
+        update-types: ["version-update:semver-major"]
+      - dependency-name: zod
+        update-types: ["version-update:semver-major"]
+      - dependency-name: express
+        update-types: ["version-update:semver-major"]
+      - dependency-name: ioredis
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
