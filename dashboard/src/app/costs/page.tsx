@@ -36,6 +36,11 @@ function formatCost(c: number): string {
   return `$${c.toFixed(4)}`;
 }
 
+function formatTooltipCost(value: unknown): string {
+  const amount = typeof value === "number" ? value : Number(value ?? 0);
+  return formatCost(amount);
+}
+
 function KpiCard({ title, value, subtitle, icon }: { title: string; value: string; subtitle: string; icon: React.ReactNode }) {
   return (
     <div className="bg-white dark:bg-gray-900 rounded-lg border border-gray-200 dark:border-gray-800 p-6">
@@ -227,7 +232,7 @@ export default function CostsPage(): JSX.Element {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="bucket" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={(v: number) => `$${v.toFixed(2)}`} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => formatCost(value)} />
+              <Tooltip formatter={(value) => formatTooltipCost(value)} />
               <Line type="monotone" dataKey="cost" stroke="#10b981" strokeWidth={2} dot={false} />
             </LineChart>
           </ResponsiveContainer>
@@ -241,7 +246,7 @@ export default function CostsPage(): JSX.Element {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="model" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={(v: number) => `$${v.toFixed(2)}`} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => formatCost(value)} />
+              <Tooltip formatter={(value) => formatTooltipCost(value)} />
               <Bar dataKey="total_cost" fill="#3b82f6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>
@@ -259,13 +264,17 @@ export default function CostsPage(): JSX.Element {
                 cx="50%"
                 cy="50%"
                 outerRadius={80}
-                label={({ provider, percent }: { provider: string; percent: number }) => `${provider} ${(percent * 100).toFixed(0)}%`}
+                label={(props) => {
+                  const name = String(props.name ?? "");
+                  const percent = props.percent ?? 0;
+                  return `${name} ${(percent * 100).toFixed(0)}%`;
+                }}
               >
                 {byProvider.map((_, i) => (
                   <Cell key={`cell-${i}`} fill={COLORS[i % COLORS.length]} />
                 ))}
               </Pie>
-              <Tooltip formatter={(value: number) => formatCost(value)} />
+              <Tooltip formatter={(value) => formatTooltipCost(value)} />
             </PieChart>
           </ResponsiveContainer>
         </div>
@@ -278,7 +287,7 @@ export default function CostsPage(): JSX.Element {
               <CartesianGrid strokeDasharray="3 3" />
               <XAxis dataKey="feature" tick={{ fontSize: 12 }} />
               <YAxis tickFormatter={(v: number) => `$${v.toFixed(2)}`} tick={{ fontSize: 12 }} />
-              <Tooltip formatter={(value: number) => formatCost(value)} />
+              <Tooltip formatter={(value) => formatTooltipCost(value)} />
               <Bar dataKey="total_cost" fill="#8b5cf6" radius={[4, 4, 0, 0]} />
             </BarChart>
           </ResponsiveContainer>

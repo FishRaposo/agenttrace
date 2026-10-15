@@ -112,7 +112,13 @@ export function TokenUsage({ spans }: TokenUsageProps): JSX.Element {
                   tick={{ fontSize: 11, fill: "#6b7280" }}
                   tickFormatter={formatTokens}
                 />
-                <Tooltip formatter={(value: number) => [formatTokens(value)]} />
+                <Tooltip
+                  formatter={(value) => {
+                    const count =
+                      typeof value === "number" ? value : Number(value ?? 0);
+                    return [formatTokens(count)];
+                  }}
+                />
                 <Legend
                   wrapperStyle={{ fontSize: "12px" }}
                   iconType="rect"
