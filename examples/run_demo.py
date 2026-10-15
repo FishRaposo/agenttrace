@@ -15,7 +15,9 @@ from agenttrace import Tracer
 from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.wrappers import trace_llm, trace_tool
 
-OUTPUT = Path(__file__).resolve().parent.parent / "data" / "demo_traces.jsonl"
+# Written under the git-ignored artifacts/ directory so running the demo never
+# modifies tracked files. Each run starts from an empty file.
+OUTPUT = Path(__file__).resolve().parent.parent / "artifacts" / "demo_traces.jsonl"
 
 tracer = Tracer()
 tracer.set_exporter(JSONLExporter(str(OUTPUT), buffer_size=1))
@@ -50,6 +52,7 @@ def answer(query: str, docs: list[str]) -> dict[str, object]:
 def main() -> None:
     print("=== AgentTrace demo (offline, JSONL export) ===")
     OUTPUT.parent.mkdir(parents=True, exist_ok=True)
+    OUTPUT.unlink(missing_ok=True)
     with tracer.run("demo_agent", metadata={"query": "vector databases"}):
         docs = retrieve("vector databases")
         result = answer("vector databases", docs)
