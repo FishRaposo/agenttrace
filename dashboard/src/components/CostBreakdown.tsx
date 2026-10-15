@@ -76,8 +76,14 @@ export function CostBreakdown({ spans }: CostBreakdownProps): JSX.Element {
                   tickFormatter={(v) => `$${v.toFixed(3)}`}
                 />
                 <Tooltip
-                  formatter={(value: number) => [`$${value.toFixed(4)}`, "Cost"]}
-                  labelFormatter={getTypeLabel}
+                  formatter={(value) => {
+                    const amount =
+                      typeof value === "number" ? value : Number(value ?? 0);
+                    return [`$${amount.toFixed(4)}`, "Cost"];
+                  }}
+                  labelFormatter={(label) =>
+                    getTypeLabel(String(label) as SpanType)
+                  }
                 />
                 <Bar dataKey="totalCost" radius={[4, 4, 0, 0]}>
                   {groups.map((g) => (

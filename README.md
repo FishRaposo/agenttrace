@@ -15,7 +15,8 @@ credentials or network-backed evaluation are required.
 
 ## Quick demonstration
 
-From the repository root:
+From the repository root (use `python3` if `python` is not on your PATH; `make`
+auto-selects `python3` when available):
 
 ```bash
 make install       # SDK + server dev extras + dashboard lockfile install
@@ -106,8 +107,8 @@ parity at the ingestion boundary.
 The canonical install path is:
 
 ```bash
-python -m pip install -e "sdk[dev]"
-python -m pip install -e "server[dev]"
+python3 -m pip install -e "sdk[dev]"
+python3 -m pip install -e "server[dev]"
 cd dashboard && npm ci
 ```
 
@@ -140,9 +141,8 @@ pyright server/app sdk/agenttrace
 ```
 
 The absorption branch currently executes 132 SDK tests and 98 server tests. The
-dashboard surface is unchanged; its previously verified 24-test result remains
-the applicable frontend baseline until the portfolio-wide clean-environment gate
-is rerun.
+dashboard adds 29 Vitest unit tests and 12 Playwright Chromium smoke tests in
+CI (`npm test`, `npm run test:e2e -- --project=chromium`).
 
 ## SDK example
 

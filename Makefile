@@ -1,4 +1,4 @@
-PYTHON := python
+PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
 NPM    := npm
 
 .PHONY: install dev demo-ui test sdk-test server-test dashboard-test lint format typecheck \
