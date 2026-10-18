@@ -18,7 +18,7 @@ classifiers = [
 ]
 
 [project.optional-dependencies]
-dev = ["pytest>=9.1.1", "pytest-cov", "mypy", "ruff", "pyright>=1.1.411"]
+dev = ["pytest>=9.1.1", "pytest-cov", "mypy", "ruff", "pyright>=1.1.414"]
 
 [tool.setuptools.packages.find]
 include = ["agenttrace*"]
