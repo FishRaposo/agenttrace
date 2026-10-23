@@ -37,8 +37,27 @@ invalid tokens still fail with `401`.
 Keep `SECRET_KEY`, database credentials, and provider keys in environment
 variables. Never commit `.env` files. Audit metadata recursively removes
 passwords, bearer tokens, API keys, authorization headers, and password hashes.
-Prompt and tool payloads are not automatically redacted before trace storage;
-redact upstream when they may contain PII or secrets.
+The0.2.0 release candidate defaults SDK capture to summaries. Raw content is an
+explicit opt-in. Supported credential keys/patterns are redacted before export
+and new persistence; historical values are redacted on presentation. Bounded
+depth and event sizes limit capture. This is not comprehensive PII detection:
+exclude sensitive data upstream. Inspect capture provenance instead of assuming
+historical records were collected under the current policy.
+
+## Local bundled launcher
+
+`PORTFOLIO_LAUNCH_ENABLED=true` explicitly enables two packaged, credential-free
+scenarios when the SDK is installed. Ingestor/admin roles can launch; viewers can
+inspect. Requests cannot supply Python, shell commands, paths, plugins or export
+destinations. The server configuration owns the collector destination. Bind to
+loopback and configure exact frontend origins. Restart interrupts unfinished
+executions without automatic relaunch. No hosted multi-user authentication or
+arbitrary workload execution is implied.
+
+Identical sanitized span deliveries are idempotent; conflicting span-ID reuse
+returns409. Run completion and export completion are separate. Queue saturation,
+timeout and an unfinished custom exporter are visible delivery states, not
+successful telemetry. See [actual setup and capture policy](portfolio-connected.md).
 
 ## Ingestion and exports
 

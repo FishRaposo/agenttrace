@@ -9,11 +9,14 @@ from app.models.alert import (
 )
 from app.models.audit import AuditLog, AuditLogResponse
 from app.models.budget import Budget, BudgetCreate, BudgetResponse, BudgetStatusResponse
+from app.models.delivery import IngestionEvent, PortfolioExecution
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
 from app.models.user import User, UserCreate, UserResponse
 
 __all__ = [
+    "IngestionEvent",
+    "PortfolioExecution",
     "Budget",
     "BudgetCreate",
     "BudgetResponse",

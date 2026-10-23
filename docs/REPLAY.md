@@ -1,6 +1,6 @@
-# Replay
+# Recorded playback (legacy replay API)
 
-Replay is a read-only view over captured spans. The SDK records inputs, outputs,
+Recorded playback is a read-only view over captured spans. The SDK records permitted inputs, outputs,
 tool and model metadata, timing, token usage, and cost. The server loads spans
 for a run in `start_time` order; the dashboard renders the timeline and the
 replay endpoint exposes the same ordered data for scripts.
@@ -18,3 +18,8 @@ must be treated as a new run.
 
 The portfolio evidence scenario includes replay-shaped canonical output so a
 reviewer can inspect the data contract without running a provider.
+
+The0.2.0 workload launcher is a separate explicit execution of bundled local
+code, with new cohort/run/span IDs. It is not a general re-execution endpoint.
+Comparisons preserve repeated logical stages through occurrence/attempt keys;
+missing stages and incompatible scenario revisions must remain visible.

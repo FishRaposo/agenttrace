@@ -7,7 +7,7 @@ from agenttrace.span import Span, SpanStatus, SpanType
 from agenttrace.tracer import Tracer
 from agenttrace.wrappers.provider_wrappers import trace_anthropic, trace_openai
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 __all__ = [
     "Tracer",
     "Span",

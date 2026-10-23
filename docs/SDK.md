@@ -1,5 +1,25 @@
 # SDK Guide
 
+## 0.2.0 release candidate
+
+One tracer can serve overlapping asyncio requests. Each context owns its root
+and immutable span stack; inherited children/threads contribute under a shared
+root lock. Same-context nested roots remain invalid. Ended roots reject late
+spans, and cancellation remains a distinct terminal outcome.
+
+Raw input/output and recognized prompt/message metadata are excluded by default.
+Use `Tracer(capture_content=True)` only for permitted content, and set the same
+explicit option on a bounded exporter wrapping it. Credential redaction still
+applies. Unknown metadata is the caller's responsibility; this is not PII
+detection. See [capture/security](SECURITY.md).
+
+`BoundedExporter` keeps slow delivery off the application path. Inspect
+`snapshot()`, `flush_until(timeout)` and `close(timeout)` results. A completed
+application does not prove delivery; unfinished/dropped/failed counters matter.
+Direct inline exporters remain available. See [actual setup](portfolio-connected.md)
+for the installed `python -m agenttrace.portfolio` workload and CLI/dashboard
+equivalence. Playback never re-executes arbitrary tools.
+
 ## Installation
 
 ```bash

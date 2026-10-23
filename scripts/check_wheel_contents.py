@@ -37,6 +37,8 @@ def main() -> int:
             "agenttrace/issue_pr/protocols.py",
             "agenttrace/issue_pr/workflow.py",
             "agenttrace/issue_pr/safety.py",
+            "agenttrace/portfolio.py",
+            "agenttrace/exporters/bounded.py",
         ),
     )
     check_wheel(

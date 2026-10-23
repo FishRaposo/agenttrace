@@ -10,6 +10,7 @@ from pydantic import AliasChoices, BaseModel, Field, model_validator
 from sqlalchemy import JSON, Boolean, DateTime, Float, String, Text
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.capture import bounded, sanitize
 from app.db import Base
 
 
@@ -37,6 +38,8 @@ class Trace(Base):
     """
 
     __tablename__ = "traces"
+    __allow_unmapped__ = True
+    delivery_cursor: int | None = None
 
     id: Mapped[str] = mapped_column(
         String(36), primary_key=True, default=lambda: str(uuid.uuid4())
@@ -169,11 +172,20 @@ class TraceResponse(BaseModel):
     sampled: bool = True
     sampling_reason: Optional[str] = None
 
+    delivery_cursor: int | None = None
+
     @model_validator(mode="before")
     @classmethod
     def from_source(cls, data: Any) -> Any:
         if isinstance(data, dict):
-            return data
+            return {
+                **data,
+                **{
+                    key: bounded(data.get(key))
+                    for key in ("input_data", "output_data", "metadata")
+                },
+                "error": sanitize(data.get("error")),
+            }
         if hasattr(data, "trace_metadata"):
             return {
                 "id": data.id,
@@ -181,21 +193,22 @@ class TraceResponse(BaseModel):
                 "span_id": data.span_id,
                 "parent_span_id": data.parent_span_id,
                 "span_type": data.span_type,
-                "name": data.name,
-                "input_data": data.input_data,
-                "output_data": data.output_data,
-                "metadata": data.trace_metadata,
+                "name": sanitize(data.name),
+                "input_data": bounded(data.input_data),
+                "output_data": bounded(data.output_data),
+                "metadata": bounded(data.trace_metadata),
                 "start_time": data.start_time,
                 "end_time": data.end_time,
                 "duration_ms": data.duration_ms,
                 "cost_usd": data.cost_usd,
                 "token_usage": data.token_usage,
                 "status": data.status,
-                "error": data.error,
-                "model": data.model,
-                "provider": data.provider,
-                "feature": data.feature,
+                "error": sanitize(data.error),
+                "model": sanitize(data.model),
+                "provider": sanitize(data.provider),
+                "feature": sanitize(data.feature),
                 "sampled": data.sampled,
                 "sampling_reason": data.sampling_reason,
+                "delivery_cursor": getattr(data, "delivery_cursor", None),
             }
         return data

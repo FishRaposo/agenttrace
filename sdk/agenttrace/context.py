@@ -26,6 +26,30 @@ class RunContext:
     """
 
     @staticmethod
+    def bind(run_id: str, metadata: Optional[dict], correlation_id: Optional[str]):
+        """Bind a root and return tokens so another tracer can restore its caller."""
+        return (
+            _current_run_id.set(run_id),
+            _current_span.set(None),
+            _current_run_metadata.set(metadata),
+            _current_correlation_id.set(correlation_id),
+        )
+
+    @staticmethod
+    def restore(tokens) -> None:
+        for variable, token in zip(
+            (
+                _current_run_id,
+                _current_span,
+                _current_run_metadata,
+                _current_correlation_id,
+            ),
+            tokens,
+            strict=True,
+        ):
+            variable.reset(token)
+
+    @staticmethod
     def set_current_run(run_id: str, metadata: Optional[dict] = None) -> None:
         """Set the current active run.
 

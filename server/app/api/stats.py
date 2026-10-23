@@ -2,8 +2,8 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends
-from sqlalchemy import func, select
+from fastapi import APIRouter, Depends, Query
+from sqlalchemy import func, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import User, require_roles
@@ -17,25 +17,34 @@ router = APIRouter()
 
 @router.get("/stats")
 async def get_stats(
+    cohort_id: str | None = Query(None),
     session: AsyncSession = Depends(get_session),
     _current_user: User = Depends(require_roles(Role.VIEWER)),  # noqa: B008
 ) -> dict:
-    total_runs_result = await session.execute(select(func.count()).select_from(Run))
+    run_filter = (
+        Run.run_metadata["cohort_id"].as_string() == cohort_id
+        if cohort_id is not None
+        else true()
+    )
+    trace_filter = Trace.run_id.in_(select(Run.id).where(run_filter))
+    total_runs_result = await session.execute(
+        select(func.count()).select_from(Run).where(run_filter)
+    )
     total_runs = total_runs_result.scalar() or 0
 
     total_cost_result = await session.execute(
-        select(func.coalesce(func.sum(Run.total_cost), 0.0))
+        select(func.coalesce(func.sum(Run.total_cost), 0.0)).where(run_filter)
     )
     total_cost = float(total_cost_result.scalar() or 0.0)
 
     total_tokens_result = await session.execute(
-        select(func.coalesce(func.sum(Run.total_tokens), 0))
+        select(func.coalesce(func.sum(Run.total_tokens), 0)).where(run_filter)
     )
     total_tokens = int(total_tokens_result.scalar() or 0)
 
     avg_duration_result = await session.execute(
         select(func.coalesce(func.avg(Trace.duration_ms), 0.0)).where(
-            Trace.duration_ms.isnot(None)
+            Trace.duration_ms.isnot(None), trace_filter
         )
     )
     avg_duration_ms = float(avg_duration_result.scalar() or 0.0)

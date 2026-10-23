@@ -34,6 +34,7 @@ function getStatusIcon(status: SpanStatus): string {
     completed: "✓",
     started: "●",
     error: "✕",
+    cancelled: "■",
   };
   return icons[status];
 }

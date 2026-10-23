@@ -1,57 +1,44 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { fetchStats, fetchRuns, isDemoMode, subscribeDemoMode } from "@/lib/api";
-
-describe("api client demo-mode fallback", () => {
-  beforeEach(() => {
-    vi.restoreAllMocks();
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { fetchStats, fetchRuns, isDemoMode, selectDataSource } from "@/lib/api";
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.unstubAllEnvs();
+});
+beforeEach(() => {
+  selectDataSource("connected");
+  vi.restoreAllMocks();
+});
+describe("explicit data sources", () => {
+  it("keeps a forced offline build local even if a caller requests connected mode", async () => {
+    vi.stubEnv("NEXT_PUBLIC_DEMO_MODE", "1");
+    selectDataSource("connected");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    expect((await fetchRuns(100)).total).toBe(20);
+    expect(fetch).not.toHaveBeenCalled();
   });
-
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
-  it("returns parsed JSON when the backend responds", async () => {
-    const payload = {
-      total_runs: 7,
-      total_cost: 1.23,
-      total_tokens: 999,
-      avg_duration_ms: 100,
-    };
+  it("returns the real response without inventing provenance", async () => {
     vi.stubGlobal(
       "fetch",
       vi.fn().mockResolvedValue({
         ok: true,
         status: 200,
-        json: async () => payload,
-      })
+        json: async () => ({ total_runs: 7 }),
+      }),
     );
-    const stats = await fetchStats();
-    expect(stats.total_runs).toBe(7);
+    expect((await fetchStats()).total_runs).toBe(7);
+    expect(isDemoMode()).toBe(false);
   });
-
-  it("falls back to demo data and activates demo mode on network failure", async () => {
-    let observed = false;
-    const unsub = subscribeDemoMode((active) => {
-      if (active) observed = true;
-    });
-    vi.stubGlobal(
-      "fetch",
-      vi.fn().mockRejectedValue(new TypeError("Failed to fetch"))
-    );
-
-    const runs = await fetchRuns(5, 0);
-    expect(runs.runs.length).toBeGreaterThan(0);
-    expect(isDemoMode()).toBe(true);
-    expect(observed).toBe(true);
-    unsub();
+  it("keeps a failed collector an error", async () => {
+    vi.stubGlobal("fetch", vi.fn().mockRejectedValue(new TypeError("offline")));
+    await expect(fetchRuns()).rejects.toThrow("offline");
+    expect(isDemoMode()).toBe(false);
   });
-
-  it("short-circuits to demo fixtures once demo mode is active", async () => {
-    // Demo mode is now active from the previous test; fetch must not be called.
-    const spy = vi.fn();
-    vi.stubGlobal("fetch", spy);
-    const stats = await fetchStats();
-    expect(stats).toBeDefined();
-    expect(spy).not.toHaveBeenCalled();
+  it("makes zero backend calls only after explicit sample selection", async () => {
+    selectDataSource("sample");
+    const fetch = vi.fn();
+    vi.stubGlobal("fetch", fetch);
+    expect((await fetchRuns(100)).total).toBe(20);
+    expect(fetch).not.toHaveBeenCalled();
   });
 });

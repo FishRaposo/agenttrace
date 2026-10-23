@@ -5,15 +5,19 @@ from __future__ import annotations
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import delete, func, select
+from sqlalchemy import case, delete, func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import User, require_roles
-from app.db import get_session
+from app.core.capture import bounded, sanitize
+from app.db import begin_span_write, get_session
 from app.internal.rbac import Role
+from app.models.delivery import IngestionEvent
 from app.models.run import Run, RunCreate, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceResponse
 from app.services.audit import record_audit
+from app.services.trace_service import _normalize_utc
 
 router = APIRouter()
 
@@ -33,45 +37,105 @@ async def create_run(
     Returns:
         The created run record.
     """
-    if run_data.id is not None:
-        existing = await session.get(Run, run_data.id)
-        if existing is not None:
-            existing.correlation_id = run_data.correlation_id
-            existing.name = run_data.name
-            existing.status = run_data.status
-            existing.start_time = run_data.start_time
-            existing.end_time = run_data.end_time
-            existing.total_cost = run_data.total_cost
-            existing.total_tokens = run_data.total_tokens
-            existing.span_count = run_data.span_count
-            existing.run_metadata = run_data.metadata
-            await session.flush()
-            return existing
+    run_id = run_data.id
+    existing = await session.get(Run, run_id) if run_id else None
+    if existing is None:
+        run = Run(
+            id=run_id,
+            name=sanitize(run_data.name),
+            status=run_data.status,
+            start_time=_normalize_utc(run_data.start_time),
+            end_time=_normalize_utc(run_data.end_time),
+            correlation_id=sanitize(run_data.correlation_id),
+            total_cost=run_data.total_cost,
+            total_tokens=run_data.total_tokens,
+            span_count=run_data.span_count,
+            run_metadata=bounded(run_data.metadata),
+            workflow_id=run_data.workflow_id,
+            feature=run_data.feature,
+        )
+        await begin_span_write(session, run_id)
+        try:
+            async with session.begin_nested():
+                session.add(run)
+                await session.flush()
+            existing = run
+        except IntegrityError:
+            existing = await session.get(Run, run_id, populate_existing=True)
+            if existing is None:
+                raise
+    merged = await _merge_run(session, existing, run_data)
+    await session.commit()
+    return merged
 
-    run_values = {
-        "correlation_id": run_data.correlation_id,
-        "name": run_data.name,
-        "status": run_data.status,
-        "start_time": run_data.start_time,
-        "end_time": run_data.end_time,
-        "total_cost": run_data.total_cost,
-        "total_tokens": run_data.total_tokens,
-        "span_count": run_data.span_count,
-        "run_metadata": run_data.metadata,
-    }
-    if run_data.id is not None:
-        run_values["id"] = run_data.id
 
-    run = Run(**run_values)
-
-    session.add(run)
-    await session.flush()
-    return run
+async def _merge_run(session: AsyncSession, existing: Run, incoming: RunCreate) -> Run:
+    """Use database conditions so delayed concurrent roots cannot reopen runs."""
+    terminal = Run.status.in_(["completed", "failed", "cancelled", "error"])
+    count = (
+        select(func.count())
+        .select_from(Trace)
+        .where(Trace.run_id == existing.id)
+        .scalar_subquery()
+    )
+    cost = (
+        select(func.coalesce(func.sum(Trace.cost_usd), 0.0))
+        .where(Trace.run_id == existing.id)
+        .scalar_subquery()
+    )
+    tokens = (
+        select(
+            func.coalesce(func.sum(Trace.token_usage["total_tokens"].as_integer()), 0)
+        )
+        .where(Trace.run_id == existing.id)
+        .scalar_subquery()
+    )
+    start = _normalize_utc(incoming.start_time) or incoming.start_time
+    await session.execute(
+        update(Run)
+        .where(Run.id == existing.id)
+        .values(
+            status=case((terminal, Run.status), else_=incoming.status),
+            end_time=case(
+                (terminal, Run.end_time), else_=_normalize_utc(incoming.end_time)
+            ),
+            start_time=case((Run.start_time > start, start), else_=Run.start_time),
+            name=sanitize(incoming.name),
+            correlation_id=sanitize(incoming.correlation_id)
+            if incoming.correlation_id is not None
+            else Run.correlation_id,
+            run_metadata=bounded(
+                {**(existing.run_metadata or {}), **(incoming.metadata or {})}
+            )
+            if incoming.metadata is not None
+            else Run.run_metadata,
+            workflow_id=incoming.workflow_id
+            if incoming.workflow_id is not None
+            else Run.workflow_id,
+            feature=incoming.feature if incoming.feature is not None else Run.feature,
+            total_cost=case(
+                (count > 0, cost), (terminal, Run.total_cost), else_=incoming.total_cost
+            ),
+            total_tokens=case(
+                (count > 0, tokens),
+                (terminal, Run.total_tokens),
+                else_=incoming.total_tokens,
+            ),
+            span_count=case(
+                (count > 0, count),
+                (terminal, Run.span_count),
+                else_=incoming.span_count,
+            ),
+        )
+    )
+    await session.refresh(existing)
+    return existing
 
 
 @router.get("/runs", response_model=RunListResponse)
 async def list_runs(
     status: Optional[str] = Query(None, description="Filter by status"),
+    cohort_id: str | None = Query(None),
     search: Optional[str] = Query(None, description="Search by run name"),
     correlation_id: Optional[str] = Query(None, description="Filter by correlation ID"),
     limit: int = Query(20, ge=1, le=100, description="Page size"),
@@ -96,6 +160,11 @@ async def list_runs(
     """
     count_stmt = select(func.count()).select_from(Run)
     list_stmt = select(Run).order_by(Run.start_time.desc())
+
+    if cohort_id is not None:
+        condition = Run.run_metadata["cohort_id"].as_string() == cohort_id
+        count_stmt = count_stmt.where(condition)
+        list_stmt = list_stmt.where(condition)
 
     if status is not None:
         count_stmt = count_stmt.where(Run.status == status)
@@ -201,6 +270,11 @@ async def delete_run(
     if run is None:
         raise HTTPException(status_code=404, detail="Run not found")
 
+    await session.execute(
+        delete(IngestionEvent).where(
+            IngestionEvent.trace_id.in_(select(Trace.id).where(Trace.run_id == run_id))
+        )
+    )
     await session.execute(delete(Trace).where(Trace.run_id == run_id))
     await session.delete(run)
     await record_audit(

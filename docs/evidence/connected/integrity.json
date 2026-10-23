@@ -1,0 +1,180 @@
+{
+  "cohort_id": "b6551c88-4db6-4221-9b50-f002521584f7",
+  "concurrent_root_statuses": [
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201,
+    201
+  ],
+  "conflict_status": 409,
+  "first_delivery": {
+    "cohort_id": "b6551c88-4db6-4221-9b50-f002521584f7",
+    "cost_usd": 0.01,
+    "delivery_cursor": 5733,
+    "duration_ms": null,
+    "id": "7363b8bd-28d5-4851-b967-4b6d2581489b",
+    "name": "delivery-probe",
+    "run_id": "7f4ec77a-40dc-4e96-84e8-ef59fce0f7be",
+    "span_id": "6ed5bee6-a853-4cec-9e42-8f14abbb2710",
+    "span_type": "tool_call",
+    "status": "completed",
+    "timestamp": "2026-10-23T07:23:04.969742"
+  },
+  "identical_retries": 3,
+  "late_delivery": {
+    "cohort_id": "b6551c88-4db6-4221-9b50-f002521584f7",
+    "cost_usd": 0.01,
+    "delivery_cursor": 5734,
+    "duration_ms": null,
+    "id": "36040fa3-ee2d-4afd-86be-5468150150e5",
+    "name": "late-arrival",
+    "run_id": "7f4ec77a-40dc-4e96-84e8-ef59fce0f7be",
+    "span_id": "289edcb7-87f4-47f8-ad2f-f2c5f9dca08b",
+    "span_type": "tool_call",
+    "status": "completed",
+    "timestamp": "2000-01-01T00:00:00"
+  },
+  "otlp_delivery": {
+    "delivered": 2,
+    "failed": 0,
+    "retries": 0
+  },
+  "otlp_run": {
+    "correlation_id": null,
+    "end_time": "2026-10-23T07:23:06.853364",
+    "feature": null,
+    "id": "7ea318b1d26945099cca7338fed0354c",
+    "metadata": {
+      "otlp.resource.service.name": "agenttrace",
+      "provider_origin": "synthetic",
+      "run.name": "SDK JSON interoperability",
+      "run.span_count": 1,
+      "run.status": "cancelled",
+      "run.total_tokens": 10
+    },
+    "name": "SDK JSON interoperability",
+    "span_count": 2,
+    "start_time": "2026-10-23T07:23:06.853364",
+    "status": "cancelled",
+    "total_cost": 0.0,
+    "total_tokens": 10,
+    "workflow_id": null
+  },
+  "otlp_spans": [
+    {
+      "cost_usd": null,
+      "delivery_cursor": null,
+      "duration_ms": 0.0,
+      "end_time": "2026-10-23T07:23:06.853364",
+      "error": "Synthetic caller cancellation",
+      "feature": null,
+      "id": "43531366-bbb5-4e21-815b-3a8d13f205a7",
+      "input_data": null,
+      "metadata": {
+        "capture": {
+          "mode": "metadata_only",
+          "redaction": "credential_patterns_v1",
+          "summaries": {
+            "input_data": {
+              "size_bytes": 4,
+              "type": "NoneType"
+            },
+            "output_data": {
+              "size_bytes": 4,
+              "type": "NoneType"
+            }
+          }
+        },
+        "gen_ai.operation.name": "chat",
+        "gen_ai.provider.name": "synthetic",
+        "gen_ai.request.model": "fixture-v1",
+        "gen_ai.response.model": "fixture-v1",
+        "gen_ai.usage.input_tokens": 7,
+        "gen_ai.usage.output_tokens": 3,
+        "operation": "chat",
+        "otlp.resource.service.name": "agenttrace",
+        "response_model": "fixture-v1"
+      },
+      "model": "fixture-v1",
+      "name": "chat",
+      "output_data": null,
+      "parent_span_id": "",
+      "provider": "synthetic",
+      "run_id": "7ea318b1d26945099cca7338fed0354c",
+      "sampled": true,
+      "sampling_reason": "disabled",
+      "span_id": "597323143396417f",
+      "span_type": "llm_call",
+      "start_time": "2026-10-23T07:23:06.853364",
+      "status": "cancelled",
+      "token_usage": {
+        "completion_tokens": 3,
+        "prompt_tokens": 7,
+        "total_tokens": 10
+      }
+    },
+    {
+      "cost_usd": null,
+      "delivery_cursor": null,
+      "duration_ms": 0.0,
+      "end_time": "2026-10-23T07:23:06.853364",
+      "error": null,
+      "feature": null,
+      "id": "372b69ea-9991-42c3-8931-e8c2b8121a91",
+      "input_data": null,
+      "metadata": {
+        "otlp.resource.service.name": "agenttrace",
+        "provider_origin": "synthetic",
+        "run.name": "SDK JSON interoperability",
+        "run.span_count": 1,
+        "run.status": "cancelled",
+        "run.total_tokens": 10
+      },
+      "model": null,
+      "name": "run:SDK JSON interoperability",
+      "output_data": null,
+      "parent_span_id": "",
+      "provider": null,
+      "run_id": "7ea318b1d26945099cca7338fed0354c",
+      "sampled": true,
+      "sampling_reason": "disabled",
+      "span_id": "7ea318b1d2694509",
+      "span_type": "custom",
+      "start_time": "2026-10-23T07:23:06.853364",
+      "status": "cancelled",
+      "token_usage": null
+    }
+  ],
+  "terminal": {
+    "correlation_id": null,
+    "end_time": "2026-10-23T07:23:04.969742",
+    "feature": null,
+    "id": "7f4ec77a-40dc-4e96-84e8-ef59fce0f7be",
+    "metadata": {
+      "cohort_id": "b6551c88-4db6-4221-9b50-f002521584f7"
+    },
+    "name": "HTTP integrity probe",
+    "span_count": 2,
+    "start_time": "2026-10-23T07:23:04.969742",
+    "status": "completed",
+    "total_cost": 0.02,
+    "total_tokens": 20,
+    "workflow_id": null
+  }
+}

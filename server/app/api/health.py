@@ -31,13 +31,13 @@ async def health_check(
         return {
             "status": "healthy",
             "database": "connected",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "uptime": round(time.time() - _start_time, 2),
         }
     except Exception:
         return {
             "status": "unhealthy",
             "database": "disconnected",
-            "version": "0.1.0",
+            "version": "0.2.0",
             "uptime": round(time.time() - _start_time, 2),
         }

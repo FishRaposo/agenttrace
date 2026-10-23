@@ -59,6 +59,7 @@ class LangChainInstrumentor(Instrumentor):
         import langchain.callbacks.manager as manager_module
 
         manager_module.CallbackManager = InstrumentedCallbackManager
+        self._prepare_delivery(self.tracer)
         self._instrumented = True
 
     def uninstrument(self) -> None:

@@ -28,3 +28,14 @@ class Instrumentor(ABC):
     def is_instrumented(self) -> bool:
         """Check if instrumentation is active."""
         return self._instrumented
+
+    @staticmethod
+    def _prepare_delivery(tracer) -> None:
+        """Framework interception must not perform blocking inline network export."""
+        from agenttrace.exporters.bounded import BoundedExporter
+
+        exporter = tracer._exporter
+        if exporter is not None and not isinstance(exporter, BoundedExporter):
+            tracer.set_exporter(
+                BoundedExporter(exporter, capture_content=tracer.capture_content)
+            )

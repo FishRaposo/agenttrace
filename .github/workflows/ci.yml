@@ -20,8 +20,8 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e "./sdk[dev]"
           pip install -e "./server[dev]"
-      - run: ruff check server/app sdk/agenttrace examples server/tests sdk/tests
-      - run: ruff format --check server/app sdk/agenttrace examples server/tests sdk/tests
+      - run: ruff check server/app sdk/agenttrace examples server/tests sdk/tests scripts
+      - run: ruff format --check server/app sdk/agenttrace examples server/tests sdk/tests scripts
 
   sdk-test:
     name: SDK Tests (standalone)
@@ -64,6 +64,8 @@ jobs:
           pip install -e ".[dev]"
       - name: Run tests with coverage report
         run: python -m pytest tests/ -q --cov=app --cov-report=term
+      - name: Verify optional ASGI lifecycle with real dependencies
+        run: python -m pytest ../sdk/tests/test_asgi_lifecycle.py -q
 
   dashboard-build:
     name: Dashboard Build
@@ -97,6 +99,7 @@ jobs:
           pip install -e "./sdk[dev]" -e "./server[dev]"
       - run: python scripts/portfolio_demo.py
       - run: python scripts/verify_portfolio_evidence.py
+      - run: python scripts/verify_connected_evidence.py --connected docs/evidence/connected/report.json --benchmark docs/evidence/tracing-benchmark.json
 
   forbidden-dependencies:
     name: Forbidden Dependency Scan

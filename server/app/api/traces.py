@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -25,6 +26,7 @@ from app.services.ingest_adapters import (
 from app.services.trace_service import TraceService
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _service(session: AsyncSession) -> TraceService:
@@ -41,21 +43,26 @@ def _service(session: AsyncSession) -> TraceService:
 
 async def _broadcast(trace: Trace) -> None:
     """Broadcast a freshly ingested trace to live WebSocket subscribers."""
-    await broadcast_trace(
-        {
-            "id": trace.id,
-            "run_id": trace.run_id,
-            "span_id": trace.span_id,
-            "span_type": trace.span_type,
-            "name": trace.name,
-            "status": trace.status,
-            "duration_ms": trace.duration_ms,
-            "cost_usd": trace.cost_usd,
-            "timestamp": trace.start_time.isoformat() if trace.start_time else None,
-            "sampled": trace.sampled,
-            "sampling_reason": trace.sampling_reason,
-        }
-    )
+    try:
+        await broadcast_trace(
+            {
+                "id": trace.id,
+                "run_id": trace.run_id,
+                "span_id": trace.span_id,
+                "span_type": trace.span_type,
+                "name": trace.name,
+                "status": trace.status,
+                "duration_ms": trace.duration_ms,
+                "cost_usd": trace.cost_usd,
+                "timestamp": trace.start_time.isoformat() if trace.start_time else None,
+                "sampled": trace.sampled,
+                "sampling_reason": trace.sampling_reason,
+            }
+        )
+    except Exception:
+        logger.warning(
+            "Live publication failed; trace remains durably stored", exc_info=True
+        )
 
 
 @router.post("/traces", response_model=TraceResponse, status_code=201)
@@ -77,15 +84,19 @@ async def ingest_trace(
     """
     service = _service(session)
     trace = await service.ingest_trace(trace_data)
-    await evaluate_rules(session)
-    await record_audit(
-        session,
-        actor=current_user.username,
-        action="trace.ingest",
-        resource=f"run:{trace.run_id}",
-        details={"span_id": trace.span_id},
-    )
-    await _broadcast(trace)
+    if service.new_trace_ids:
+        await evaluate_rules(session)
+    if service.new_trace_ids:
+        await record_audit(
+            session,
+            actor=current_user.username,
+            action="trace.ingest",
+            resource=f"run:{trace.run_id}",
+            details={"span_id": trace.span_id},
+        )
+    await session.commit()
+    if trace.id in service.new_trace_ids:
+        await _broadcast(trace)
     return trace
 
 
@@ -108,16 +119,20 @@ async def ingest_traces_batch(
     """
     service = _service(session)
     traces = await service.ingest_traces_batch(trace_data_list)
-    await evaluate_rules(session)
-    await record_audit(
-        session,
-        actor=current_user.username,
-        action="trace.batch_ingest",
-        resource="traces",
-        details={"count": len(traces)},
-    )
-    for trace in traces:
-        await _broadcast(trace)
+    if service.new_trace_ids:
+        await evaluate_rules(session)
+    if service.new_trace_ids:
+        await record_audit(
+            session,
+            actor=current_user.username,
+            action="trace.batch_ingest",
+            resource="traces",
+            details={"count": len(service.new_trace_ids)},
+        )
+    await session.commit()
+    for trace in {trace.id: trace for trace in traces}.values():
+        if trace.id in service.new_trace_ids:
+            await _broadcast(trace)
     return traces
 
 
@@ -125,6 +140,7 @@ async def ingest_traces_batch(
 async def list_traces(
     run_id: Optional[str] = Query(None, description="Filter by run ID"),
     span_type: Optional[str] = Query(None, description="Filter by span type"),
+    cohort_id: str | None = Query(None),
     limit: int = Query(50, ge=1, le=200, description="Maximum results"),
     offset: int = Query(0, ge=0, description="Result offset"),
     session: AsyncSession = Depends(get_session),
@@ -144,7 +160,11 @@ async def list_traces(
     """
     service = _service(session)
     return await service.list_traces(
-        run_id=run_id, span_type=span_type, limit=limit, offset=offset
+        run_id=run_id,
+        span_type=span_type,
+        limit=limit,
+        offset=offset,
+        cohort_id=cohort_id,
     )
 
 
@@ -171,16 +191,20 @@ async def ingest_shared_spans(
     service = _service(session)
     trace_creates = [span_to_trace_create(s) for s in spans]
     traces = await service.ingest_spans(trace_creates)
-    await evaluate_rules(session)
-    await record_audit(
-        session,
-        actor=current_user.username,
-        action="trace.canonical_ingest",
-        resource="traces",
-        details={"count": len(traces)},
-    )
-    for trace in traces:
-        await _broadcast(trace)
+    if service.new_trace_ids:
+        await evaluate_rules(session)
+    if service.new_trace_ids:
+        await record_audit(
+            session,
+            actor=current_user.username,
+            action="trace.canonical_ingest",
+            resource="traces",
+            details={"count": len(service.new_trace_ids)},
+        )
+    await session.commit()
+    for trace in {trace.id: trace for trace in traces}.values():
+        if trace.id in service.new_trace_ids:
+            await _broadcast(trace)
     return traces
 
 
@@ -206,16 +230,20 @@ async def ingest_cost_records(
     service = _service(session)
     trace_creates = [cost_record_to_trace_create(r) for r in records]
     traces = await service.ingest_spans(trace_creates)
-    await evaluate_rules(session)
-    await record_audit(
-        session,
-        actor=current_user.username,
-        action="cost.ingest",
-        resource="traces",
-        details={"count": len(traces)},
-    )
-    for trace in traces:
-        await _broadcast(trace)
+    if service.new_trace_ids:
+        await evaluate_rules(session)
+    if service.new_trace_ids:
+        await record_audit(
+            session,
+            actor=current_user.username,
+            action="cost.ingest",
+            resource="traces",
+            details={"count": len(service.new_trace_ids)},
+        )
+    await session.commit()
+    for trace in {trace.id: trace for trace in traces}.values():
+        if trace.id in service.new_trace_ids:
+            await _broadcast(trace)
     return traces
 
 

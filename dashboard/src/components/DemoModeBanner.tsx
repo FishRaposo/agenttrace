@@ -5,8 +5,7 @@ import { Database } from "lucide-react";
 import { isDemoForced, subscribeDemoMode } from "@/lib/api";
 
 /**
- * Banner shown whenever the dashboard is serving demo fixtures because demo
- * mode is forced on or the AgentTrace backend is unreachable.
+ * Compatibility banner for explicitly selected sample data.
  */
 export function DemoModeBanner(): JSX.Element | null {
   const [active, setActive] = useState(false);
@@ -18,9 +17,7 @@ export function DemoModeBanner(): JSX.Element | null {
     return null;
   }
 
-  const message = forced
-    ? "Sample data — deterministic fixtures for portfolio review."
-    : "Backend offline — showing sample data. Start the server for live telemetry.";
+  const message = "Interactive sample data — deterministic fixtures for portfolio review. No backend calls.";
 
   return (
     <div
@@ -31,7 +28,7 @@ export function DemoModeBanner(): JSX.Element | null {
     >
       <Database className="h-4 w-4 shrink-0" />
       <span>
-        <span className="font-semibold">Demo mode</span> — {message}
+        {message}
       </span>
     </div>
   );
