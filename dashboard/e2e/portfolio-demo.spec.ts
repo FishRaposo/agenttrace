@@ -104,14 +104,14 @@ for (const size of sizes) {
       .getByRole("button", { name: "Next step", exact: true })
       .click();
     await page
-      .getByRole("link", { name: "request-19, failed", exact: true })
+      .getByRole("link", { name: "request-19 failed", exact: true })
       .click();
     await expect(
       page.getByRole("region", { name: "Selected span" }),
     ).toContainText("exceeded its timeout");
     await page.getByRole("link", { name: "Runs", exact: true }).click();
     await page
-      .getByRole("link", { name: "request-20, cancelled", exact: true })
+      .getByRole("link", { name: "request-20 cancelled", exact: true })
       .click();
     await expect(
       page.getByRole("region", { name: "Selected span" }),
@@ -163,7 +163,9 @@ for (const size of sizes) {
     ).toHaveCount(0);
     for (const theme of ["light", "dark"]) {
       if (theme === "dark")
-        await page.getByRole("button", { name: "Toggle theme" }).click();
+        await page
+          .getByRole("button", { name: "Switch to Dark theme" })
+          .click();
       const contrasts = await page
         .locator(".outcome")
         .evaluateAll((elements) => {
@@ -197,7 +199,9 @@ for (const size of sizes) {
           `${theme} ${contrast.status} contrast`,
         ).toBeGreaterThanOrEqual(4.5);
     }
-    await page.getByRole("button", { name: "Toggle theme" }).click();
+    await page
+      .getByRole("button", { name: "Switch to Light theme" })
+      .click();
     await page.keyboard.press("Tab");
     await expect(page.locator(":focus")).not.toHaveCount(0);
     expect(

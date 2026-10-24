@@ -138,3 +138,65 @@ jobs:
         run: docker build -t agenttrace-server ./server
       - name: Build dashboard image
         run: docker build -t agenttrace-dashboard ./dashboard
+
+  connected-live:
+    name: Connected dashboard against real collector
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ./dashboard
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.11"
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "20"
+      - name: Install SDK + self-contained server
+        working-directory: .
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e "./sdk[dev]" -e "./server[dev]"
+      - name: Start disposable loopback collector
+        working-directory: .
+        env:
+          DATABASE_URL: sqlite+aiosqlite:///${{ runner.temp }}/agenttrace-live/agenttrace.db
+          AUTH_REQUIRED: "false"
+          PORTFOLIO_LAUNCH_ENABLED: "true"
+          PORTFOLIO_COLLECTOR_URL: http://127.0.0.1:8300
+          CORS_ORIGINS: '["http://localhost:3404","http://127.0.0.1:3404"]'
+          RATE_LIMIT_REQUESTS: "100000"
+          TRACE_SAMPLING_MODE: "off"
+        run: |
+          mkdir -p "$RUNNER_TEMP/agenttrace-live"
+          nohup python -m uvicorn app.main:app --app-dir server \
+            --host 127.0.0.1 --port 8300 \
+            > "$RUNNER_TEMP/collector.log" 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl -sf http://127.0.0.1:8300/health > /dev/null; then
+              echo "collector ready after ${attempt}s"; exit 0
+            fi
+            sleep 1
+          done
+          echo "collector failed to start"; cat "$RUNNER_TEMP/collector.log"; exit 1
+      - run: npm ci
+      - name: Build dashboard against live collector
+        env:
+          NEXT_PUBLIC_API_URL: http://127.0.0.1:8300
+        run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - name: Verify connected HTTP contracts
+        working-directory: .
+        run: |
+          python scripts/verify_connected_portfolio.py --endpoint http://127.0.0.1:8300
+          python scripts/verify_connected_integrity.py --endpoint http://127.0.0.1:8300
+      - name: Live browser suite
+        env:
+          AGENTTRACE_API_URL: http://127.0.0.1:8300
+          AGENTTRACE_SCREENSHOTS: ${{ runner.temp }}/agenttrace-live/shots
+        run: npm run test:e2e:live
+      - name: Collector log on failure
+        if: failure()
+        working-directory: .
+        run: cat "$RUNNER_TEMP/collector.log" || true

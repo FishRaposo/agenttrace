@@ -32,7 +32,7 @@ $env:PLAYWRIGHT_EXECUTABLE_PATH = 'C:/path/to/chrome.exe' # only if the Playwrig
 npm run test:e2e -- --project=chromium
 ```
 
-The offline suite starts the production dashboard on3404, explicitly selects sample data and verifies all three required layouts (390×844, 768×1024, 1440×900), guided/free investigation, comparison, playback/reset, reduced motion, keyboard focus, console health and zero off-origin requests. It does not depend on a failed API call.
+The offline suite starts the production dashboard on3404, explicitly selects sample data and verifies all three required layouts (390×844, 768×1024, 1440×900), guided/free investigation, comparison, playback/reset, reduced motion, keyboard focus, console health and zero off-origin requests. It does not depend on a failed API call. The same run includes eight axe-core WCAG 2.1 A/AA scans across the five main routes, a run-detail route and two mobile widths; two `label-content-name-mismatch` defects found this way were repaired and are regression-covered by these scans.
 
 The separate connected suite requires dedicated running API and production frontend processes:
 
@@ -47,4 +47,4 @@ It performs real launches and reads stored reports through actual API responses.
 
 `/workflow` links the packaged `public/evidence` Markdown documents generated from the verified project documentation. Those files are copies for local inspection, not public publication or hosted CI evidence.
 
-The5 remaining high npm audit findings are in the development ESLint toolchain. Next.js and Vitest were patched; npm's proposed ESLint fix requires an incompatible downgrade and was not forced. See the dated verification record for dependency details. This local dashboard does not claim hosted multi-user authentication, provider trials or production-scale performance.
+As of the 2026-10-24 audit, `npm audit` reports zero findings (the remaining dev-ESLint `zod` advisory was cleared by an in-range upgrade). See the dated verification record for dependency details. This local dashboard does not claim hosted multi-user authentication, provider trials or production-scale performance.

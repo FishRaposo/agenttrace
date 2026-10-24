@@ -433,9 +433,9 @@ export function RequestLanes({ runs }: { runs: Run[] }) {
               href={`/runs/${run.id}`}
               key={run.id}
               className="lane"
-              aria-label={`${run.name}, ${run.status}`}
+              aria-label={`${run.name} ${run.status}`}
             >
-              <span>{run.name}</span>
+              <span>{run.name} </span>
               <span className="lane-track">
                 <span
                   className={`lane-bar ${run.status}`}

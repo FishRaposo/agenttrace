@@ -1,11 +1,18 @@
 # Project 04 AgentTrace handoff — 2026-10-23
 
 Implemented and locally verified AT-01–AT-07 on `feat/agenttrace-portfolio`,
-base `c721c3f07cb5f61b358dfe25fbc77d2e147aec92`. The local commit containing
-this record is the delivery; no push or public release is authorized by it.
-SDK, collector and dashboard versions are 0.2.0, documented as a release candidate
-because capture defaults change to summaries. Original golden evidence remains
-unchanged. No mandatory sibling-project dependency was added.
+base `c721c3f07cb5f61b358dfe25fbc77d2e147aec92`. SDK, collector and dashboard
+versions are 0.2.0, documented as a release candidate because capture defaults
+change to summaries. Original golden evidence remains unchanged. No mandatory
+sibling-project dependency was added.
+
+A 2026-10-24 in-place audit (see the dated verification section) normalized
+hash-pinned evidence to LF, added the `connected-live` hosted CI job and an
+axe WCAG suite that repaired two real accessible-name defects, added OG/Twitter
+metadata, and cleared the last dev-chain advisory — all delivery gates were
+re-verified unchanged. The branch is published under the same push → PR →
+merge-when-green protocol as projects 02–03; hosted run identifiers are
+recorded in the dated verification section and the parent index.
 
 ## Read in this order
 

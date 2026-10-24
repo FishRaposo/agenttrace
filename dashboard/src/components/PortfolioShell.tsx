@@ -78,7 +78,7 @@ export function PortfolioShell({ children }: { children: React.ReactNode }) {
         <div className="release-tag">0.2.0 · local release candidate</div>
         <button
           className="icon-button"
-          aria-label="Toggle theme"
+          aria-label={`Switch to ${dark ? "Light" : "Dark"} theme`}
           onClick={() => setDark(!dark)}
         >
           {dark ? "Light" : "Dark"}

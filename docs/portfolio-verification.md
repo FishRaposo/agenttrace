@@ -179,3 +179,33 @@ public hosting/publication and hosted multi-user authentication remain unverifie
 or outside scope. Root overview guard passes. The broader operation validator
 cannot decode existing nested files, and its copy-all unit harness was not rerun;
 these are not passing project gates. See [handoff](portfolio-handoff.md).
+
+## 2026-10-24 — audit refresh (this section extends, not supersedes)
+
+An in-place audit of `feat/agenttrace-portfolio` re-verified every gate above:
+SDK 171 passed/81%, server 124 passed/69%, ASGI lifecycle 8, ruff check+format
+149 files, pyright 0, portfolio-demo + evidence + connected-evidence verifiers,
+forbidden-dependency scan, 0.2.0 wheel build/contents/isolated import outside
+the checkout; dashboard 41 units, eslint 0 warnings, production build 8 routes,
+npm audit **zero** findings (dev `zod` advisory cleared in range), 3/3 offline
+and 3/3 real-process connected browser journeys.
+
+Repairs/additions: hash-pinned evidence fixtures were CRLF-based on Windows
+and would have failed the hosted evidence verifier on LF checkouts —
+`.gitattributes` now pins them to LF and all four `.sha256` digests were
+re-pinned (verified locally on LF bytes). A new `connected-live` CI job runs a
+disposable loopback collector + production dashboard through the HTTP
+integrity/persistence verifiers and the connected Playwright suite on Linux.
+A new axe-core suite (8 scans, WCAG 2.1 A/AA) found and repaired two real
+`label-content-name-mismatch` defects — run-lane links whose accessible name
+omitted a visible-text separator, and the theme toggle whose label excluded
+its visible state; Open Graph/Twitter metadata added. Bounded review of the
+new launch/dedup/lease, ingestion fingerprint dedup, endpoint bounds (all
+paginated `le=100..500`), draft-only issue-PR boundary and loopback-only
+collector URL found no additional defects.
+
+Limits unchanged: no native/model/human claims, no Docker/PostgreSQL
+verification locally (the docker-build job is exercised by hosted CI only),
+no formal accessibility certification. **Hosted status:** pending — this audit
+commits ahead of the first push; PR and hosted-run identifiers are recorded
+in the project handoff and parent index after merge.
