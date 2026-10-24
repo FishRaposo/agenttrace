@@ -14,6 +14,15 @@ class BaseExporter(ABC):
     and flushing buffered data.
     """
 
+    def delivery_stats(self) -> dict[str, int]:
+        """Optional cumulative transport accounting; empty means custom handoff only."""
+        return {}
+
+    def close(self, timeout: float = 5.0) -> dict[str, Any] | None:
+        """Inline exporters flush; bounded exporters override the deadline."""
+        self.flush()
+        return None
+
     @abstractmethod
     def export_run(self, run_data: dict[str, Any]) -> None:
         """Export run-level trace data.

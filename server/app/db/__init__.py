@@ -85,6 +85,16 @@ def _repair_sqlite_schema(sync_conn) -> None:
         sync_conn.execute(
             text("ALTER TABLE traces ADD COLUMN sampling_reason VARCHAR(50)")
         )
+    sync_conn.execute(
+        text(
+            "INSERT INTO ingestion_events "
+            "(trace_id, span_id, payload_hash, cohort_id, created_at) "
+            "SELECT id, span_id, NULL, "
+            "json_extract(trace_metadata, '$.cohort_id'), CURRENT_TIMESTAMP "
+            "FROM traces WHERE id NOT IN (SELECT trace_id FROM ingestion_events) "
+            "ORDER BY start_time, id"
+        )
+    )
     user_columns = {column["name"] for column in inspector.get_columns("users")}
     if "role" not in user_columns:
         sync_conn.execute(
@@ -92,4 +102,22 @@ def _repair_sqlite_schema(sync_conn) -> None:
                 "ALTER TABLE users ADD COLUMN role VARCHAR(20) NOT NULL "
                 "DEFAULT 'viewer'"
             )
+        )
+
+
+async def dispose_db() -> None:
+    """Release SQLite handles and pooled resources on process shutdown."""
+    await engine.dispose()
+
+
+async def begin_span_write(session: AsyncSession, run_id: str | None) -> None:
+    """Establish the outer SQLite write transaction before a savepoint.
+
+    Python sqlite3 legacy mode otherwise releases a first SAVEPOINT as a commit.
+    The no-op DML also obtains the SQLite writer lock before read/modify/write.
+    PostgreSQL already has normal transactional SAVEPOINT semantics.
+    """
+    if session.bind is not None and session.bind.dialect.name == "sqlite":
+        await session.execute(
+            text("UPDATE runs SET id=id WHERE id=:run_id"), {"run_id": run_id}
         )

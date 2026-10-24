@@ -1,0 +1,43 @@
+{
+  "interrupted_job": {
+    "id": "c75c03e4-c228-440e-a717-dff87d2dbd85",
+    "request_id": "06b63d80-4ed7-47c7-86b1-d00471db9e1b",
+    "scenario": "incident",
+    "status": "interrupted",
+    "cohort_id": "c98adc1b-800c-4bb8-8634-c9484a52babd",
+    "progress": {
+      "completed": 0,
+      "total": 20
+    },
+    "run_ids": [],
+    "application_outcomes": {},
+    "delivery": {
+      "complete": false,
+      "unfinished": null
+    },
+    "error": "Restart interrupted execution. Explicit new launch required.",
+    "created_at": "2026-10-23T07:07:24.502182",
+    "updated_at": "2026-10-23T07:07:45.606831"
+  },
+  "partial_runs": {
+    "runs": [],
+    "total": 0,
+    "limit": 20,
+    "offset": 0
+  },
+  "completed_cohort_stats": {
+    "incident": {
+      "total_runs": 20,
+      "total_cost": 0.0034000000000000002,
+      "total_tokens": 2720,
+      "avg_duration_ms": 7.787178571428571
+    },
+    "repaired": {
+      "total_runs": 20,
+      "total_cost": 0.0036000000000000003,
+      "total_tokens": 2880,
+      "avg_duration_ms": 22.718362068965515
+    }
+  },
+  "redispatched": false
+}

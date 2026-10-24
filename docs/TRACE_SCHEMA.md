@@ -1,5 +1,21 @@
 # Trace Schema
 
+## 0.2.0 compatibility and provenance
+
+Public run/span keys remain compatible. Default SDK input/output bodies are null
+with capture summaries and policy metadata; raw bodies need explicit opt-in.
+Credential redaction applies before export and new persistence. Historical
+records without provenance remain unknown and are redacted on presentation.
+
+Bundled workload metadata carries `cohort_id`, stable `case_id`/`stage_key`,
+`scenario_revision`, `pricing_revision`, execution/provider/usage/pricing origin.
+Provider/usage values are synthetic and pricing is illustrative. New runs/spans
+have unique actual IDs. Delivery completion is distinct from application outcome.
+The durable live cursor describes ingestion order, not application start time.
+
+See [the frozen GenAI attribute subset](GENAI_CONVENTIONS.md) and
+[current local verification](portfolio-verification.md).
+
 ## Run
 
 Represents a complete agent execution from start to finish.

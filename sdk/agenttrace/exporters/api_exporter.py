@@ -9,6 +9,7 @@ import urllib.error
 import urllib.request
 from typing import Any
 
+from agenttrace.capture import redact
 from agenttrace.exporters.base import BaseExporter
 
 _HAS_URLLIB = True
@@ -34,8 +35,9 @@ class APIExporter(BaseExporter):
         self,
         endpoint: str = "http://localhost:8000/api/traces",
         buffer_size: int = 50,
-        max_retries: int = 3,
-        timeout: float = 10.0,
+        max_retries: int = 2,
+        timeout: float = 2.0,
+        headers: dict[str, str] | None = None,
     ) -> None:
         self._api_base_url = self._normalize_api_base_url(endpoint)
         self._runs_url = f"{self._api_base_url}/runs"
@@ -44,8 +46,10 @@ class APIExporter(BaseExporter):
         self._buffer_size = buffer_size
         self._max_retries = max_retries
         self._timeout = timeout
+        self._headers = {"Content-Type": "application/json", **(headers or {})}
         self._run_buffer: list[dict[str, Any]] = []
         self._span_buffer: list[dict[str, Any]] = []
+        self._delivery = {"delivered": 0, "failed": 0, "retries": 0}
 
     @staticmethod
     def _normalize_api_base_url(endpoint: str) -> str:
@@ -79,18 +83,25 @@ class APIExporter(BaseExporter):
             return False
 
         try:
-            payload = json.dumps(data, default=str).encode("utf-8")
+            payload = json.dumps(redact(data), default=str).encode("utf-8")
             req = urllib.request.Request(
                 url,
                 data=payload,
-                headers={"Content-Type": "application/json"},
+                headers=self._headers,
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 return 200 <= resp.status < 300
         except Exception as e:
+            if (
+                isinstance(e, urllib.error.HTTPError)
+                and 400 <= e.code < 500
+                and e.code not in (408, 429)
+            ):
+                return False
             if attempt < self._max_retries - 1:
-                backoff = 2**attempt
+                self._delivery["retries"] += 1
+                backoff = min(0.05 * 2**attempt, 0.2)
                 logger.warning(
                     "Export failed (attempt %d/%d): %s. Retrying in %ds",
                     attempt + 1,
@@ -111,7 +122,8 @@ class APIExporter(BaseExporter):
             return
 
         for run_data in self._run_buffer:
-            self._send_request(self._runs_url, run_data)
+            success = self._send_request(self._runs_url, run_data)
+            self._delivery["delivered" if success else "failed"] += 1
 
         self._run_buffer.clear()
 
@@ -122,10 +134,11 @@ class APIExporter(BaseExporter):
 
         payloads = [self._span_payload(s) for s in self._span_buffer]
         if len(payloads) == 1:
-            self._send_request(self._traces_url, payloads[0])
+            success = self._send_request(self._traces_url, payloads[0])
         else:
-            self._send_request(self._traces_batch_url, payloads)
+            success = self._send_request(self._traces_batch_url, payloads)
 
+        self._delivery["delivered" if success else "failed"] += len(payloads)
         self._span_buffer.clear()
 
     def export_run(self, run_data: dict[str, Any]) -> None:
@@ -152,3 +165,6 @@ class APIExporter(BaseExporter):
         """Flush all buffered data to the trace server."""
         self._flush_runs()
         self._flush_spans()
+
+    def delivery_stats(self) -> dict[str, int]:
+        return dict(self._delivery)

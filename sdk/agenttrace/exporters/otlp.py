@@ -6,9 +6,11 @@ import json
 import logging
 import os
 import time
+import urllib.error
 import urllib.request
 from typing import Any, Optional
 
+from agenttrace.capture import redact
 from agenttrace.exporters.base import BaseExporter
 
 _HAS_URLLIB = True
@@ -16,6 +18,9 @@ _HAS_URLLIB = True
 logger = logging.getLogger(__name__)
 
 _NANOS_PER_SECOND = 1_000_000_000
+# Six attributes only; this is not a claim of full OTLP/protobuf interoperability.
+GENAI_CONVENTION_REVISION = "9ffc7e00c639be7712e544e3e54331e885dccf84"
+GENAI_CONVENTION_REVIEWED = "2026-10-23"
 
 
 def _to_nanos(dt_str: str) -> int:
@@ -50,6 +55,7 @@ def _span_to_otlp(span_data: dict[str, Any], service_name: str) -> dict[str, Any
     Returns:
         OTLP-compatible span dictionary.
     """
+    span_data = redact(span_data)
     start_ns = _to_nanos(span_data.get("start_time", ""))
     end_ns = (
         _to_nanos(span_data.get("end_time", "")) if span_data.get("end_time") else None
@@ -77,6 +83,38 @@ def _span_to_otlp(span_data: dict[str, Any], service_name: str) -> dict[str, Any
                 "value": {"intValue": str(tu.get("total_tokens", 0))},
             }
         )
+    metadata = span_data.get("metadata") or {}
+    if metadata:
+        attrs.append(
+            {
+                "key": "agenttrace.metadata",
+                "value": {"stringValue": json.dumps(metadata)},
+            }
+        )
+    values = {
+        "gen_ai.operation.name": metadata.get("operation")
+        or ("chat" if span_data.get("span_type") == "llm_call" else None),
+        "gen_ai.provider.name": metadata.get("provider"),
+        "gen_ai.request.model": metadata.get("request_model") or metadata.get("model"),
+        "gen_ai.response.model": metadata.get("response_model")
+        or metadata.get("model"),
+    }
+    for key, value in values.items():
+        if value is not None:
+            attrs.append({"key": key, "value": {"stringValue": str(value)}})
+    usage = span_data.get("token_usage") or {}
+    for key, value in (
+        (
+            "gen_ai.usage.input_tokens",
+            usage.get("input_tokens", usage.get("prompt_tokens")),
+        ),
+        (
+            "gen_ai.usage.output_tokens",
+            usage.get("output_tokens", usage.get("completion_tokens")),
+        ),
+    ):
+        if value is not None:
+            attrs.append({"key": key, "value": {"intValue": str(value)}})
     if span_data.get("error"):
         attrs.append(
             {"key": "error.message", "value": {"stringValue": span_data["error"]}}
@@ -132,17 +170,19 @@ class OTLPExporter(BaseExporter):
         endpoint: str = "http://localhost:4318/v1/traces",
         service_name: Optional[str] = None,
         buffer_size: int = 50,
-        max_retries: int = 3,
-        timeout: float = 10.0,
+        max_retries: int = 2,
+        timeout: float = 2.0,
     ) -> None:
         self._endpoint = endpoint.rstrip("/")
         self._service_name = service_name or os.environ.get(
             "OTEL_SERVICE_NAME", "agenttrace"
         )
+        self._service_name = redact(self._service_name)
         self._buffer_size = buffer_size
         self._max_retries = max_retries
         self._timeout = timeout
         self._span_buffer: list[dict[str, Any]] = []
+        self._delivery = {"delivered": 0, "failed": 0, "retries": 0}
 
     def export_run(self, run_data: dict[str, Any]) -> None:
         """Export run data as an OTLP scope span.
@@ -150,6 +190,11 @@ class OTLPExporter(BaseExporter):
         Args:
             run_data: Run dictionary to convert and buffer.
         """
+        # OTLP ingests immutable finished spans. An in-progress root would reuse
+        # the same span ID with different content when it later terminates.
+        if run_data.get("status") == "running" or not run_data.get("end_time"):
+            return
+        run_data = redact(run_data)
         start_ns = _to_nanos(run_data.get("start_time", ""))
         end_ns = (
             _to_nanos(run_data.get("end_time", ""))
@@ -158,6 +203,15 @@ class OTLPExporter(BaseExporter):
         )
 
         attrs: list[dict[str, Any]] = [
+            {"key": "span.type", "value": {"stringValue": "custom"}},
+            {
+                "key": "span.status",
+                "value": {
+                    "stringValue": "error"
+                    if run_data.get("status") == "failed"
+                    else run_data.get("status", "completed")
+                },
+            },
             {
                 "key": "run.name",
                 "value": {"stringValue": run_data.get("name", "unknown")},
@@ -171,6 +225,13 @@ class OTLPExporter(BaseExporter):
                 "value": {"intValue": str(run_data.get("span_count", 0))},
             },
         ]
+        if run_data.get("metadata"):
+            attrs.append(
+                {
+                    "key": "agenttrace.metadata",
+                    "value": {"stringValue": json.dumps(run_data["metadata"])},
+                }
+            )
         if run_data.get("correlation_id"):
             attrs.append(
                 {
@@ -202,7 +263,9 @@ class OTLPExporter(BaseExporter):
             "startTimeUnixNano": str(start_ns),
             "endTimeUnixNano": str(end_ns) if end_ns else str(start_ns),
             "attributes": attrs,
-            "status": {"code": 2 if run_data.get("status") == "failed" else 1},
+            "status": {
+                "code": 2 if run_data.get("status") in ("failed", "cancelled") else 1
+            },
         }
 
         self._span_buffer.append(otlp_span)
@@ -243,8 +306,10 @@ class OTLPExporter(BaseExporter):
             ]
         }
 
+        count = len(self._span_buffer)
         self._span_buffer.clear()
-        self._send_with_retry(payload)
+        success = self._send_with_retry(payload)
+        self._delivery["delivered" if success else "failed"] += count
 
     def _send_with_retry(self, payload: dict[str, Any], attempt: int = 0) -> bool:
         """Send OTLP payload with retry logic.
@@ -271,8 +336,15 @@ class OTLPExporter(BaseExporter):
             with urllib.request.urlopen(req, timeout=self._timeout) as resp:
                 return 200 <= resp.status < 300
         except Exception as e:
+            if (
+                isinstance(e, urllib.error.HTTPError)
+                and 400 <= e.code < 500
+                and e.code not in (408, 429)
+            ):
+                return False
             if attempt < self._max_retries - 1:
-                backoff = 2**attempt
+                self._delivery["retries"] += 1
+                backoff = min(0.05 * 2**attempt, 0.2)
                 logger.warning(
                     "OTLP export failed (attempt %d/%d): %s. Retrying in %ds",
                     attempt + 1,
@@ -292,3 +364,6 @@ class OTLPExporter(BaseExporter):
     def flush(self) -> None:
         """Flush all buffered spans to the OTLP collector."""
         self._flush()
+
+    def delivery_stats(self) -> dict[str, int]:
+        return dict(self._delivery)

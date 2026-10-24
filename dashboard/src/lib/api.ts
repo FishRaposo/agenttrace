@@ -17,97 +17,81 @@ import type {
   BudgetStatus,
   DailyCostReport,
 } from "@/types";
-import { demoIssuePrSpans, demoResponseFor, demoSpans } from "@/lib/demoData";
+import { demoResponseFor } from "@/lib/demoData";
+import { sampleResponse } from "@/lib/demo-scenarios";
+import {
+  getPortfolioState,
+  setPortfolio,
+  subscribePortfolio,
+} from "@/lib/portfolio-state";
 
 const API_BASE_URL: string =
   process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
 
-/**
- * Whether demo mode is forced on via env. When unset, demo mode activates
- * automatically the first time a network request to the backend fails.
- */
-const DEMO_FORCED: boolean = process.env.NEXT_PUBLIC_DEMO_MODE === "1";
-
-let demoMode = DEMO_FORCED;
-const demoListeners = new Set<(active: boolean) => void>();
-
-/** Returns true when the dashboard is serving demo fixtures. */
+/** Sample mode is explicit. Transport failures never change the source. */
 export function isDemoMode(): boolean {
-  return demoMode;
+  return getPortfolioState().source === "sample";
 }
-
-/** Returns true when demo mode is forced via NEXT_PUBLIC_DEMO_MODE=1. */
 export function isDemoForced(): boolean {
-  return DEMO_FORCED;
+  return process.env.NEXT_PUBLIC_DEMO_MODE === "1";
 }
-
-/** Subscribe to demo-mode changes; returns an unsubscribe function. */
-export function subscribeDemoMode(listener: (active: boolean) => void): () => void {
-  demoListeners.add(listener);
-  listener(demoMode);
-  return () => demoListeners.delete(listener);
+export function subscribeDemoMode(
+  listener: (active: boolean) => void,
+): () => void {
+  listener(isDemoMode());
+  return subscribePortfolio(() => listener(isDemoMode()));
 }
-
-function setDemoMode(active: boolean): void {
-  if (demoMode === active) return;
-  demoMode = active;
-  demoListeners.forEach((l) => l(active));
+export function selectDataSource(source: "sample" | "connected") {
+  setPortfolio({ source });
 }
-
-/** Internal: read a demo fixture for a path, or throw if none exists. */
-function demoOrThrow<T>(path: string): T {
-  const data = demoResponseFor(path);
-  if (data === undefined) {
-    throw new Error(`No demo data available for ${path}`);
+export async function readApi<T>(
+  path: string,
+  options?: RequestInit,
+): Promise<T> {
+  if (isDemoMode()) {
+    if (options?.method && options.method !== "GET")
+      throw new Error("Interactive sample data is read only.");
+    const data =
+      sampleResponse(path, getPortfolioState().scenario) ??
+      (path.startsWith("/api/runs/") && !path.includes("demo-run-")
+        ? undefined
+        : demoResponseFor(path));
+    if (data === undefined)
+      throw new Error("No recorded sample exists for this request.");
+    return data as T;
   }
-  return data as T;
-}
-
-async function fetchApi<T>(path: string, options?: RequestInit): Promise<T> {
-  // When demo mode is already active, short-circuit to fixtures (GET only).
-  if (demoMode && (!options?.method || options.method === "GET")) {
-    return demoOrThrow<T>(path);
-  }
-
-  const url = `${API_BASE_URL}${path}`;
-  let response: Response;
-  try {
-    response = await fetch(url, {
-      headers: {
-        "Content-Type": "application/json",
-        ...options?.headers,
-      },
-      ...options,
-    });
-  } catch (err) {
-    // Network failure (backend offline) — fall back to demo data for reads.
-    if (!options?.method || options.method === "GET") {
-      const data = demoResponseFor(path);
-      if (data !== undefined) {
-        setDemoMode(true);
-        return data as T;
-      }
-    }
-    throw err;
-  }
-
+  const response = await fetch(`${API_BASE_URL}${path}`, {
+    ...options,
+    cache: "no-store",
+    headers: { "Content-Type": "application/json", ...options?.headers },
+  });
   if (!response.ok) {
-    throw new Error(`API error: ${response.status} ${response.statusText}`);
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail =
+        typeof body.detail === "string"
+          ? body.detail
+          : JSON.stringify(body.detail ?? body);
+    } catch {
+      /* response may be empty */
+    }
+    throw new Error(
+      `Collector ${response.status}: ${detail || response.statusText}`,
+    );
   }
-
-  if (response.status === 204) {
-    return undefined as T;
-  }
-
-  return response.json() as Promise<T>;
+  return response.status === 204
+    ? (undefined as T)
+    : (response.json() as Promise<T>);
 }
+const fetchApi = readApi;
 
 export async function fetchRuns(
   limit: number = 20,
   offset: number = 0,
   correlationId?: string,
   status?: string,
-  search?: string
+  search?: string,
 ): Promise<RunListResponse> {
   const params = new URLSearchParams({
     limit: String(limit),
@@ -145,8 +129,13 @@ export async function healthCheck(): Promise<HealthResponse> {
   return fetchApi<HealthResponse>("/health");
 }
 
-export async function diffRuns(runId1: string, runId2: string): Promise<RunDiff> {
-  return fetchApi<RunDiff>(`/api/diff/runs?run_id_1=${runId1}&run_id_2=${runId2}`);
+export async function diffRuns(
+  runId1: string,
+  runId2: string,
+): Promise<RunDiff> {
+  return fetchApi<RunDiff>(
+    `/api/diff/runs?run_id_1=${runId1}&run_id_2=${runId2}`,
+  );
 }
 
 export async function getReplayData(runId: string): Promise<ReplayData> {
@@ -154,44 +143,92 @@ export async function getReplayData(runId: string): Promise<ReplayData> {
 }
 
 // Cost analytics
-export async function fetchCostSummary(promptVersion?: string): Promise<CostSummary> {
+export async function fetchCostSummary(
+  promptVersion?: string,
+): Promise<CostSummary> {
   const params = new URLSearchParams();
   if (promptVersion) params.set("prompt_version", promptVersion);
   const query = params.toString();
   return fetchApi<CostSummary>(`/api/costs/summary${query ? `?${query}` : ""}`);
 }
 
-export async function fetchDailyCostReport(promptVersion?: string): Promise<DailyCostReport> {
+export async function fetchDailyCostReport(
+  promptVersion?: string,
+): Promise<DailyCostReport> {
   const params = new URLSearchParams({ format: "json" });
   if (promptVersion) params.set("prompt_version", promptVersion);
-  return fetchApi<DailyCostReport>(`/api/costs/reports/daily?${params.toString()}`);
+  return fetchApi<DailyCostReport>(
+    `/api/costs/reports/daily?${params.toString()}`,
+  );
 }
 
 export async function fetchCostTimeseries(
   granularity: string = "day",
-  days: number = 30
+  days: number = 30,
 ): Promise<CostTimeseries> {
-  return fetchApi<CostTimeseries>(`/api/costs/timeseries?granularity=${granularity}&days=${days}`);
+  return fetchApi<CostTimeseries>(
+    `/api/costs/timeseries?granularity=${granularity}&days=${days}`,
+  );
 }
 
 export async function fetchCostByModel(): Promise<ModelCostBreakdown[]> {
   return fetchApi<ModelCostBreakdown[]>("/api/costs/by-model");
 }
 
-export async function fetchCostByProvider(): Promise<{ provider: string; total_cost: number; span_count: number }[]> {
-  return fetchApi<{ provider: string; total_cost: number; span_count: number }[]>("/api/costs/by-provider");
+export async function fetchCostByProvider(): Promise<
+  { provider: string; total_cost: number; span_count: number }[]
+> {
+  return fetchApi<
+    { provider: string; total_cost: number; span_count: number }[]
+  >("/api/costs/by-provider");
 }
 
-export async function fetchCostByFeature(): Promise<{ feature: string; total_cost: number; span_count: number }[]> {
-  return fetchApi<{ feature: string; total_cost: number; span_count: number }[]>("/api/costs/by-feature");
+export async function fetchCostByFeature(): Promise<
+  { feature: string; total_cost: number; span_count: number }[]
+> {
+  return fetchApi<
+    { feature: string; total_cost: number; span_count: number }[]
+  >("/api/costs/by-feature");
 }
 
-export async function fetchTopExpensiveRuns(limit: number = 10): Promise<{ id: string; name: string; total_cost: number; total_tokens: number; span_count: number; status: string; start_time: string }[]> {
-  return fetchApi<{ id: string; name: string; total_cost: number; total_tokens: number; span_count: number; status: string; start_time: string }[]>(`/api/costs/top-runs?limit=${limit}`);
+export async function fetchTopExpensiveRuns(
+  limit: number = 10,
+): Promise<
+  {
+    id: string;
+    name: string;
+    total_cost: number;
+    total_tokens: number;
+    span_count: number;
+    status: string;
+    start_time: string;
+  }[]
+> {
+  return fetchApi<
+    {
+      id: string;
+      name: string;
+      total_cost: number;
+      total_tokens: number;
+      span_count: number;
+      status: string;
+      start_time: string;
+    }[]
+  >(`/api/costs/top-runs?limit=${limit}`);
 }
 
-export async function fetchCostProjection(): Promise<{ trailing_7d_cost: number; trailing_30d_cost: number; daily_burn: number; monthly_projection: number }> {
-  return fetchApi<{ trailing_7d_cost: number; trailing_30d_cost: number; daily_burn: number; monthly_projection: number }>("/api/costs/projection");
+export async function fetchCostProjection(): Promise<{
+  trailing_7d_cost: number;
+  trailing_30d_cost: number;
+  daily_burn: number;
+  monthly_projection: number;
+}> {
+  return fetchApi<{
+    trailing_7d_cost: number;
+    trailing_30d_cost: number;
+    daily_burn: number;
+    monthly_projection: number;
+  }>("/api/costs/projection");
 }
 
 // Budgets
@@ -199,44 +236,39 @@ export async function fetchBudgets(): Promise<Budget[]> {
   return fetchApi<Budget[]>("/api/budgets");
 }
 
-export async function fetchBudgetStatus(budgetId: string): Promise<BudgetStatus> {
+export async function fetchBudgetStatus(
+  budgetId: string,
+): Promise<BudgetStatus> {
   return fetchApi<BudgetStatus>(`/api/budgets/${budgetId}/status`);
 }
 
-// Live tail (SSE)
-export function streamTraces(callback: (trace: TraceResponse) => void): () => void {
-  if (demoMode || DEMO_FORCED) {
-    const pool = [...demoIssuePrSpans, ...demoSpans].slice(0, 12);
-    let index = 0;
-    const timer = window.setInterval(() => {
-      const span = pool[index % pool.length];
-      callback({
-        ...span,
-        id: `${span.id}-live-${index}`,
-        start_time: new Date().toISOString(),
-        end_time: new Date().toISOString(),
-      });
-      index += 1;
-    }, 1800);
-    return () => window.clearInterval(timer);
-  }
-
-  const url = `${API_BASE_URL}/api/stream/traces`;
-  const eventSource = new EventSource(url);
-
-  eventSource.onmessage = (event) => {
+// Live collector events: keep the durable cursor on reconnect; never fabricate spans.
+export function streamTraces(
+  callback: (trace: TraceResponse) => void,
+  options?: {
+    cohort?: string;
+    cursor?: string;
+    onError?: (message: string) => void;
+    onOpen?: () => void;
+  },
+): () => void {
+  if (isDemoMode()) return () => {};
+  const query = new URLSearchParams();
+  if (options?.cohort) query.set("cohort_id", options.cohort);
+  if (options?.cursor) query.set("cursor", options.cursor);
+  const source = new EventSource(`${API_BASE_URL}/api/stream/traces?${query}`);
+  source.onopen = () => options?.onOpen?.();
+  source.onmessage = (event) => {
     try {
-      const data = JSON.parse(event.data);
-      callback(data as TraceResponse);
+      callback(JSON.parse(event.data) as TraceResponse);
     } catch {
-      // ignore parse errors
+      options?.onError?.("Invalid collector event received.");
     }
   };
-
-  eventSource.onerror = () => {
-    eventSource.close();
-    setDemoMode(true);
+  source.onerror = () => {
+    options?.onError?.(
+      "Collector stream disconnected. Reconnecting from the last delivery cursor.",
+    );
   };
-
-  return () => eventSource.close();
+  return () => source.close();
 }

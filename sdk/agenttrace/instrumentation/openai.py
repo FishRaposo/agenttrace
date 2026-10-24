@@ -6,11 +6,12 @@ and AsyncCompletions.create to automatically trace every chat completion call.
 
 from __future__ import annotations
 
+import asyncio
 from typing import Any
 
 from agenttrace.cost_tracker import CostTracker
 from agenttrace.instrumentation.base import Instrumentor
-from agenttrace.span import SpanType
+from agenttrace.span import SpanStatus, SpanType
 from agenttrace.tracer import Tracer
 
 
@@ -99,6 +100,10 @@ class OpenAIInstrumentor(Instrumentor):
                         span.cost_usd = 0.0
 
                 return response
+            except asyncio.CancelledError:
+                span.set_error("Provider request cancelled")
+                span.status = SpanStatus.CANCELLED
+                raise
             except Exception as e:
                 span.set_error(str(e))
                 raise
@@ -163,6 +168,7 @@ class OpenAIInstrumentor(Instrumentor):
 
         completions.create = _traced_create_sync
         async_completions.create = _traced_create_async
+        self._prepare_delivery(self.tracer)
         self._instrumented = True
 
     def uninstrument(self) -> None:

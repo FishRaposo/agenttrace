@@ -17,6 +17,7 @@ from app.api.costs import router as costs_router
 from app.api.diff import router as diff_router
 from app.api.health import router as health_router
 from app.api.otlp import router as otlp_router
+from app.api.portfolio import router as portfolio_router
 from app.api.realtime import close_all_connections
 from app.api.realtime import router as realtime_router
 from app.api.replay import router as replay_router
@@ -26,13 +27,14 @@ from app.api.stream import router as stream_router
 from app.api.traces import router as traces_router
 from app.config import settings
 from app.core.logging import setup_logging
-from app.db import init_db
+from app.db import dispose_db, init_db
 from app.internal.vendor_core.errors import (
     BaseApplicationError,
     application_error_handler,
 )
 from app.internal.vendor_core.logging import RequestLoggingMiddleware
 from app.internal.vendor_core.ratelimit import RateLimiter, RateLimitMiddleware
+from app.services.portfolio import recover_interrupted, stop_executions
 
 
 @asynccontextmanager
@@ -47,14 +49,19 @@ async def lifespan(application: FastAPI) -> AsyncGenerator[None, None]:
     """
     setup_logging()
     await init_db()
-    yield
-    await close_all_connections()
+    await recover_interrupted()
+    try:
+        yield
+    finally:
+        await stop_executions()
+        await close_all_connections()
+        await dispose_db()
 
 
 app = FastAPI(
     title="AgentTrace Server",
     description="Observability and replay layer for agentic AI workflows",
-    version="0.1.0",
+    version="0.2.0",
     lifespan=lifespan,
 )
 
@@ -66,7 +73,10 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-rate_limiter = RateLimiter(limit=100, window_seconds=60)
+rate_limiter = RateLimiter(
+    limit=settings.RATE_LIMIT_REQUESTS,
+    window_seconds=settings.RATE_LIMIT_WINDOW_SECONDS,
+)
 app.state.rate_limiter = rate_limiter
 app.add_middleware(RateLimitMiddleware, limiter=rate_limiter)
 app.add_middleware(RequestLoggingMiddleware)
@@ -83,6 +93,7 @@ app.include_router(budgets_router, prefix="/api", tags=["budgets"])
 app.include_router(costs_router, prefix="/api", tags=["costs"])
 app.include_router(diff_router, prefix="/api", tags=["diff"])
 app.include_router(health_router, tags=["health"])
+app.include_router(portfolio_router, prefix="/api", tags=["portfolio"])
 app.include_router(otlp_router, prefix="/api", tags=["otlp"])
 app.include_router(realtime_router, tags=["realtime"])
 app.include_router(replay_router, prefix="/api", tags=["replay"])
@@ -119,4 +130,4 @@ async def root() -> dict[str, str]:
     Returns:
         Dictionary with server name and version.
     """
-    return {"name": "AgentTrace Server", "version": "0.1.0"}
+    return {"name": "AgentTrace Server", "version": "0.2.0"}

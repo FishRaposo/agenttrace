@@ -9,6 +9,16 @@ from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.tracer import Tracer
 
 
+@pytest.fixture(autouse=True)
+def isolate_global_trace_context():
+    """Legacy direct-start tests leave roots open; never leak them into another test."""
+    from agenttrace.context import RunContext
+
+    RunContext.clear()
+    yield
+    RunContext.clear()
+
+
 @pytest.fixture
 def tracer() -> Tracer:
     """Create a fresh Tracer instance for testing."""

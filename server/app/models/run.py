@@ -10,6 +10,7 @@ from pydantic import AliasChoices, BaseModel, Field, model_validator
 from sqlalchemy import JSON, DateTime, Float, Integer, String
 from sqlalchemy.orm import Mapped, mapped_column
 
+from app.core.capture import bounded, sanitize
 from app.db import Base
 
 
@@ -125,17 +126,17 @@ class RunResponse(BaseModel):
         if hasattr(data, "run_metadata"):
             return {
                 "id": data.id,
-                "correlation_id": data.correlation_id,
-                "name": data.name,
+                "correlation_id": sanitize(data.correlation_id),
+                "name": sanitize(data.name),
                 "status": data.status,
                 "start_time": data.start_time,
                 "end_time": data.end_time,
                 "total_cost": data.total_cost,
                 "total_tokens": data.total_tokens,
                 "span_count": data.span_count,
-                "metadata": data.run_metadata,
-                "workflow_id": data.workflow_id,
-                "feature": data.feature,
+                "metadata": bounded(data.run_metadata),
+                "workflow_id": sanitize(data.workflow_id),
+                "feature": sanitize(data.feature),
             }
         return data
 

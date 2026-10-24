@@ -11,19 +11,23 @@ AgentTrace cost/token attribution while keeping protobuf and gRPC out of scope.
 
 from __future__ import annotations
 
+import json
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import User, require_roles
+from app.api.runs import _merge_run
 from app.config import settings
+from app.core.capture import bounded, sanitize
 from app.db import get_session
 from app.internal.rbac import Role
 from app.internal.sampling import SamplingPolicy
+from app.models.run import RunCreate
 from app.models.trace import Trace, TraceCreate
 from app.services.trace_service import TraceService
 
@@ -68,17 +72,45 @@ def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:  # noqa: C901
         attributes.append(_attr("agenttrace.cost_usd", trace.cost_usd))
     if trace.model:
         attributes.append(_attr("llm.model", trace.model))
+        attributes.append(_attr("gen_ai.request.model", trace.model))
+        attributes.append(
+            _attr(
+                "gen_ai.response.model",
+                (trace.trace_metadata or {}).get("gen_ai.response.model", trace.model),
+            )
+        )
     if trace.provider:
         attributes.append(_attr("llm.provider", trace.provider))
+        attributes.append(_attr("gen_ai.provider.name", trace.provider))
     if trace.feature:
         attributes.append(_attr("agenttrace.feature", trace.feature))
     if trace.token_usage:
         for k, v in trace.token_usage.items():
             if isinstance(v, int):
                 attributes.append(_attr(f"llm.usage.{k}", v))
+    if trace.span_type == "llm_call":
+        attributes.append(
+            _attr(
+                "gen_ai.operation.name",
+                (trace.trace_metadata or {}).get("gen_ai.operation.name", "chat"),
+            )
+        )
+    if trace.token_usage:
+        attributes.extend(
+            [
+                _attr(
+                    "gen_ai.usage.input_tokens",
+                    trace.token_usage.get("prompt_tokens", 0),
+                ),
+                _attr(
+                    "gen_ai.usage.output_tokens",
+                    trace.token_usage.get("completion_tokens", 0),
+                ),
+            ]
+        )
     attributes.append(_attr("agenttrace.sampled", trace.sampled))
 
-    metadata = trace.trace_metadata or {}
+    metadata = bounded(trace.trace_metadata) or {}
     events = metadata.get("otlp.events")
     links = metadata.get("otlp.links")
 
@@ -101,8 +133,8 @@ def _trace_to_otlp_span(trace: Trace) -> dict[str, Any]:  # noqa: C901
     if trace.parent_span_id:
         span["parentSpanId"] = trace.parent_span_id
     if trace.error:
-        span["status"]["message"] = trace.error
-    return span
+        span["status"]["message"] = sanitize(trace.error)
+    return sanitize(span)
 
 
 @router.get("/otlp/v1/traces")
@@ -136,7 +168,7 @@ async def export_otlp_traces(
                     {
                         "scope": {
                             "name": "agenttrace.collector",
-                            "version": "0.1.0",
+                            "version": "0.2.0",
                         },
                         "spans": [_trace_to_otlp_span(t) for t in traces],
                     }
@@ -224,7 +256,7 @@ def _nano_to_datetime(value: Optional[str]) -> Optional[datetime]:
         return None
 
 
-def _otlp_span_to_trace_create(
+def _otlp_span_to_trace_create(  # noqa: C901 - additive legacy and GenAI mapping
     span: OTLPSpan,
     *,
     resource_attributes: dict[str, Any] | None = None,
@@ -233,10 +265,18 @@ def _otlp_span_to_trace_create(
     """Convert an inbound OTLP span into a :class:`TraceCreate`."""
     attrs = {kv.key: _attr_value(kv) for kv in span.attributes}
 
-    span_type = attrs.get("agenttrace.span_type", "custom")
-    cost = attrs.get("agenttrace.cost_usd")
-    model = attrs.get("llm.model")
-    provider = attrs.get("llm.provider")
+    span_type = attrs.get(
+        "agenttrace.span_type",
+        attrs.get(
+            "span.type", "llm_call" if attrs.get("gen_ai.operation.name") else "custom"
+        ),
+    )
+    cost = attrs.get("agenttrace.cost_usd", attrs.get("cost.usd"))
+    model = attrs.get(
+        "gen_ai.response.model",
+        attrs.get("gen_ai.request.model", attrs.get("llm.model")),
+    )
+    provider = attrs.get("gen_ai.provider.name", attrs.get("llm.provider"))
     feature = attrs.get("agenttrace.feature")
 
     token_usage: dict[str, int] = {}
@@ -244,7 +284,42 @@ def _otlp_span_to_trace_create(
         if k.startswith("llm.usage.") and isinstance(v, int):
             token_usage[k.removeprefix("llm.usage.")] = v
 
-    metadata: dict[str, Any] = {}
+    if "gen_ai.usage.input_tokens" in attrs or "gen_ai.usage.output_tokens" in attrs:
+        token_usage["prompt_tokens"] = int(attrs.get("gen_ai.usage.input_tokens", 0))
+        token_usage["completion_tokens"] = int(
+            attrs.get("gen_ai.usage.output_tokens", 0)
+        )
+        token_usage["total_tokens"] = (
+            token_usage["prompt_tokens"] + token_usage["completion_tokens"]
+        )
+    elif isinstance(attrs.get("tokens.total"), int):
+        token_usage["total_tokens"] = attrs["tokens.total"]
+
+    metadata: dict[str, Any] = {
+        key: value
+        for key, value in attrs.items()
+        if key.startswith("gen_ai.")
+        or key
+        in {
+            "cohort_id",
+            "case_id",
+            "stage_key",
+            "scenario_revision",
+            "pricing_revision",
+        }
+    }
+    encoded = attrs.get("agenttrace.metadata")
+    if encoded is not None:
+        try:
+            decoded = json.loads(encoded)
+        except (TypeError, ValueError):
+            raise HTTPException(422, "Invalid agenttrace.metadata JSON") from None
+        if not isinstance(decoded, dict):
+            raise HTTPException(422, "agenttrace.metadata must be an object")
+        metadata = {**bounded(decoded), **metadata}
+    for key, value in attrs.items():
+        if key.startswith("run."):
+            metadata[key] = value
     for key, value in (resource_attributes or {}).items():
         metadata[f"otlp.resource.{key}"] = value
     if scope:
@@ -279,8 +354,12 @@ def _otlp_span_to_trace_create(
         duration_ms=duration,
         cost_usd=float(cost) if isinstance(cost, (int, float)) else None,
         token_usage=token_usage or None,
-        status=_OTLP_STATUS_REVERSE.get(status_code, "completed"),
-        error=(span.status or {}).get("message"),
+        status=str(attrs.get("span.status"))
+        if attrs.get("span.status") in {"completed", "started", "error", "cancelled"}
+        else "cancelled"
+        if attrs.get("run.status") == "cancelled"
+        else _OTLP_STATUS_REVERSE.get(status_code, "completed"),
+        error=(span.status or {}).get("message") or attrs.get("error.message"),
         sampled=True,
         sampling_reason=None,
         model=str(model) if model else None,
@@ -335,6 +414,30 @@ async def ingest_otlp_traces(
         ),
     )
     traces = await service.ingest_spans(trace_creates) if trace_creates else []
+    for item in trace_creates:
+        metadata = item.metadata or {}
+        status = metadata.get("run.status")
+        if status in {"completed", "failed", "cancelled"} and item.end_time is not None:
+            run = await service.ensure_run_exists(item.run_id)
+            await _merge_run(
+                session,
+                run,
+                RunCreate(
+                    id=item.run_id,
+                    name=metadata.get("run.name", item.name),
+                    status=status,
+                    start_time=item.start_time,
+                    end_time=item.end_time,
+                    correlation_id=metadata.get("run.correlation_id"),
+                    metadata=metadata,
+                    total_cost=0.0,
+                    total_tokens=0,
+                    span_count=0,
+                    workflow_id=None,
+                    feature=None,
+                ),
+            )
+    await session.commit()
 
     return {
         "partialSuccess": {

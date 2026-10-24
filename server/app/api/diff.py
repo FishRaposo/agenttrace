@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import require_roles
+from app.core.capture import present
 from app.db import get_session
 from app.internal.rbac import Role
 from app.models.run import Run
@@ -77,42 +78,94 @@ async def diff_runs(
     )
     duration_diff = duration2 - duration1
 
-    # Compare spans by name and type
-    span_names1 = {(s.name, s.span_type) for s in spans1}
-    span_names2 = {(s.name, s.span_type) for s in spans2}
+    def stages(spans):
+        counts = {}
+        indexed = {}
+        for span in spans:
+            metadata = span.trace_metadata or {}
+            source_stage = metadata.get("stage_key")
+            stage = (
+                source_stage
+                if isinstance(source_stage, str) and source_stage
+                else f"{span.span_type}:{span.name}"
+            )
+            counts[stage] = counts.get(stage, 0) + 1
+            key = (
+                stage,
+                _ordinal(metadata.get("occurrence"), counts[stage]),
+                _ordinal(metadata.get("attempt"), 1),
+            )
+            if key in indexed:
+                occurrence = counts[stage]
+                while (stage, occurrence, key[2]) in indexed:
+                    occurrence += 1
+                key = (stage, occurrence, key[2])
+            indexed[key] = span
+        return indexed
 
-    only_in_run1 = list(span_names1 - span_names2)
-    only_in_run2 = list(span_names2 - span_names1)
-    common_spans = list(span_names1 & span_names2)
-
-    # Find span differences for common spans
-    span_differences = []
-    for name, span_type in common_spans:
-        span1 = next(
-            (s for s in spans1 if s.name == name and s.span_type == span_type), None
-        )
-        span2 = next(
-            (s for s in spans2 if s.name == name and s.span_type == span_type), None
-        )
-
-        if span1 and span2:
-            diff = {
-                "name": name,
-                "span_type": span_type,
-                "duration_diff": (span2.duration_ms or 0) - (span1.duration_ms or 0),
-                "cost_diff": (span2.cost_usd or 0) - (span1.cost_usd or 0),
-                "status_changed": span1.status != span2.status,
-                "status_1": span1.status,
-                "status_2": span2.status,
+    stages1, stages2 = stages(spans1), stages(spans2)
+    common = sorted(stages1.keys() & stages2.keys())
+    aligned = []
+    for key in common:
+        first, second = stages1[key], stages2[key]
+        aligned.append(
+            {
+                "stage_key": key[0],
+                "occurrence": key[1],
+                "attempt": key[2],
+                "name": first.name,
+                "span_type": first.span_type,
+                "span_id_1": first.span_id,
+                "span_id_2": second.span_id,
+                "duration_diff": (second.duration_ms or 0) - (first.duration_ms or 0),
+                "cost_diff": (second.cost_usd or 0) - (first.cost_usd or 0),
+                "status_changed": first.status != second.status,
+                "status_1": first.status,
+                "status_2": second.status,
             }
-            if (
-                diff["duration_diff"] != 0
-                or diff["cost_diff"] != 0
-                or diff["status_changed"]
-            ):
-                span_differences.append(diff)
-
-    return {
+        )
+    unmatched = {
+        "only_in_run1": [
+            {"stage_key": k[0], "occurrence": k[1], "attempt": k[2]}
+            for k in sorted(stages1.keys() - stages2.keys())
+        ],
+        "only_in_run2": [
+            {"stage_key": k[0], "occurrence": k[1], "attempt": k[2]}
+            for k in sorted(stages2.keys() - stages1.keys())
+        ],
+    }
+    revision1 = (run1.run_metadata or {}).get("scenario_revision")
+    revision2 = (run2.run_metadata or {}).get("scenario_revision")
+    revision1 = revision1 if isinstance(revision1, str) and revision1 else None
+    revision2 = revision2 if isinstance(revision2, str) and revision2 else None
+    compatible = revision1 == revision2 if revision1 and revision2 else None
+    compatibility = {
+        "compatible": compatible,
+        "reason": "matching scenario revisions"
+        if compatible
+        else "scenario revisions differ"
+        if compatible is False
+        else "historical scenario revision unknown",
+        "scenario_revision_1": revision1,
+        "scenario_revision_2": revision2,
+    }
+    only_in_run1 = [
+        (stages1[k].name, stages1[k].span_type)
+        for k in sorted(stages1.keys() - stages2.keys())
+    ]
+    only_in_run2 = [
+        (stages2[k].name, stages2[k].span_type)
+        for k in sorted(stages2.keys() - stages1.keys())
+    ]
+    span_differences = [
+        item
+        for item in aligned
+        if item["duration_diff"] or item["cost_diff"] or item["status_changed"]
+    ]
+    result = {
+        "aligned_stages": aligned,
+        "unmatched_stages": unmatched,
+        "compatibility": compatibility,
         "run1": {
             "id": run1.id,
             "name": run1.name,
@@ -142,7 +195,19 @@ async def diff_runs(
         "spans": {
             "only_in_run1": only_in_run1,
             "only_in_run2": only_in_run2,
-            "common_count": len(common_spans),
+            "common_count": len(common),
             "differences": span_differences,
         },
     }
+
+    return present(result)
+
+
+def _ordinal(value: Any, fallback: int) -> int:
+    return (
+        value
+        if isinstance(value, int)
+        and not isinstance(value, bool)
+        and 1 <= value <= 1000000
+        else fallback
+    )

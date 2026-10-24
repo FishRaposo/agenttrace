@@ -2,14 +2,21 @@
 
 from __future__ import annotations
 
+import hashlib
+import json
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Optional
 
-from sqlalchemy import func, select
+from fastapi import HTTPException
+from sqlalchemy import func, select, update
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.capture import bounded, sanitize
+from app.db import begin_span_write
 from app.internal.sampling import SamplingPolicy
+from app.models.delivery import IngestionEvent
 from app.models.run import Run, RunListResponse, RunResponse
 from app.models.trace import Trace, TraceCreate, TraceResponse
 
@@ -36,6 +43,7 @@ class TraceService:
     ) -> None:
         self._session = session
         self._sampling_policy = sampling_policy or SamplingPolicy()
+        self.new_trace_ids: set[str] = set()
 
     def _decision(self, trace_data: TraceCreate):
         return self._sampling_policy.decide(
@@ -47,117 +55,93 @@ class TraceService:
         )
 
     async def ingest_trace(self, trace_data: TraceCreate) -> Trace:
-        """Ingest a new trace record and update run stats incrementally.
-
-        Args:
-            trace_data: Validated trace creation payload.
-
-        Returns:
-            The persisted Trace record.
-        """
+        """Persist a sanitized span exactly once, with a durable delivery cursor."""
         decision = self._decision(trace_data)
+        fingerprint = hashlib.sha256(
+            json.dumps(
+                trace_data.model_dump(mode="json"),
+                sort_keys=True,
+                separators=(",", ":"),
+            ).encode()
+        ).hexdigest()
         trace = Trace(
             id=str(uuid.uuid4()),
             run_id=trace_data.run_id,
             span_id=trace_data.span_id,
             parent_span_id=trace_data.parent_span_id,
             span_type=trace_data.span_type,
-            name=trace_data.name,
-            input_data=trace_data.input_data,
-            output_data=trace_data.output_data,
-            trace_metadata=trace_data.metadata,
+            name=sanitize(trace_data.name),
+            input_data=bounded(trace_data.input_data),
+            output_data=bounded(trace_data.output_data),
+            trace_metadata=bounded(trace_data.metadata),
             start_time=_normalize_utc(trace_data.start_time),
             end_time=_normalize_utc(trace_data.end_time),
             duration_ms=trace_data.duration_ms,
             cost_usd=trace_data.cost_usd,
             token_usage=trace_data.token_usage,
             status=trace_data.status,
-            error=trace_data.error,
-            model=trace_data.model,
-            provider=trace_data.provider,
-            feature=trace_data.feature,
+            error=sanitize(trace_data.error),
+            model=sanitize(trace_data.model),
+            provider=sanitize(trace_data.provider),
+            feature=sanitize(trace_data.feature),
             sampled=decision.sampled,
             sampling_reason=decision.reason,
         )
         if not decision.sampled:
             return trace
-        self._session.add(trace)
+        await begin_span_write(self._session, trace_data.run_id)
+        try:
+            async with self._session.begin_nested():
+                self._session.add(trace)
+                await self._session.flush()
+        except IntegrityError:
+            existing = (
+                await self._session.execute(
+                    select(Trace).where(Trace.span_id == trace_data.span_id)
+                )
+            ).scalar_one_or_none()
+            if existing is None:
+                raise
+            event = (
+                await self._session.execute(
+                    select(IngestionEvent).where(IngestionEvent.trace_id == existing.id)
+                )
+            ).scalar_one_or_none()
+            if event is None or (
+                event.payload_hash != fingerprint
+                and not (
+                    event.payload_hash is None and _same_saved_span(existing, trace)
+                )
+            ):
+                raise HTTPException(409, "Conflicting span_id reuse") from None
+            if event.payload_hash is None:
+                event.payload_hash = fingerprint
+                await self._session.flush()
+            existing.delivery_cursor = event.cursor
+            return existing
+        metadata = trace.trace_metadata or {}
+        event = IngestionEvent(
+            trace_id=trace.id,
+            span_id=trace.span_id,
+            payload_hash=fingerprint,
+            cohort_id=metadata.get("cohort_id"),
+        )
+        self._session.add(event)
         await self._session.flush()
-
-        # Increment run stats atomically
+        trace.delivery_cursor = event.cursor
+        self.new_trace_ids.add(trace.id)
         await self._increment_run_stats(
-            run_id=trace_data.run_id,
-            cost=trace_data.cost_usd or 0.0,
-            tokens=(trace_data.token_usage or {}).get("total_tokens", 0),
+            trace_data.run_id,
+            trace_data.cost_usd or 0.0,
+            (trace_data.token_usage or {}).get("total_tokens", 0),
         )
         return trace
 
     async def ingest_traces_batch(
         self, trace_data_list: list[TraceCreate]
     ) -> list[Trace]:
-        """Ingest multiple traces and update run stats incrementally.
-
-        Args:
-            trace_data_list: List of validated trace creation payloads.
-
-        Returns:
-            The persisted Trace records.
-        """
-        traces: list[Trace] = []
-        run_deltas: dict[str, tuple[float, int, int]] = {}
-
-        for trace_data in trace_data_list:
-            decision = self._decision(trace_data)
-            trace = Trace(
-                id=str(uuid.uuid4()),
-                run_id=trace_data.run_id,
-                span_id=trace_data.span_id,
-                parent_span_id=trace_data.parent_span_id,
-                span_type=trace_data.span_type,
-                name=trace_data.name,
-                input_data=trace_data.input_data,
-                output_data=trace_data.output_data,
-                trace_metadata=trace_data.metadata,
-                start_time=_normalize_utc(trace_data.start_time),
-                end_time=_normalize_utc(trace_data.end_time),
-                duration_ms=trace_data.duration_ms,
-                cost_usd=trace_data.cost_usd,
-                token_usage=trace_data.token_usage,
-                status=trace_data.status,
-                error=trace_data.error,
-                model=trace_data.model,
-                provider=trace_data.provider,
-                feature=trace_data.feature,
-                sampled=decision.sampled,
-                sampling_reason=decision.reason,
-            )
-            if decision.sampled:
-                self._session.add(trace)
-            traces.append(trace)
-
-            # Aggregate deltas per run
-            if not decision.sampled:
-                continue
-            cost = trace_data.cost_usd or 0.0
-            tokens = (trace_data.token_usage or {}).get("total_tokens", 0)
-            prev_cost, prev_tokens, prev_count = run_deltas.get(
-                trace_data.run_id, (0.0, 0, 0)
-            )
-            run_deltas[trace_data.run_id] = (
-                prev_cost + cost,
-                prev_tokens + tokens,
-                prev_count + 1,
-            )
-
-        await self._session.flush()
-
-        # Apply incremental updates per run
-        for run_id, (cost_delta, token_delta, count_delta) in run_deltas.items():
-            await self._increment_run_stats(
-                run_id, cost_delta, token_delta, count_delta
-            )
-
-        return traces
+        """Use the same idempotent boundary for native and adapted batches."""
+        return [await self.ingest_trace(item) for item in trace_data_list]
 
     async def ensure_run_exists(self, run_id: str, name: str | None = None) -> Run:
         """Return the run for ``run_id``, creating a placeholder if missing.
@@ -182,8 +166,16 @@ class TraceService:
             name=name or f"ingested-{run_id[:8]}",
             status="running",
         )
-        self._session.add(run)
-        await self._session.flush()
+        await begin_span_write(self._session, run_id)
+        try:
+            async with self._session.begin_nested():
+                self._session.add(run)
+                await self._session.flush()
+        except IntegrityError:
+            winner = await self._session.get(Run, run_id, populate_existing=True)
+            if winner is None:
+                raise
+            return winner
         return run
 
     async def ingest_spans(
@@ -224,13 +216,26 @@ class TraceService:
             tokens: Tokens to add.
             count: Span count to add (default 1).
         """
-        stmt = select(Run).where(Run.id == run_id).with_for_update()
-        result = await self._session.execute(stmt)
-        run = result.scalar_one_or_none()
-        if run is not None:
-            run.total_cost += cost
-            run.total_tokens += tokens
-            run.span_count += count
+        await self._session.execute(
+            update(Run)
+            .where(Run.id == run_id)
+            .values(
+                total_cost=select(func.coalesce(func.sum(Trace.cost_usd), 0.0))
+                .where(Trace.run_id == run_id)
+                .scalar_subquery(),
+                total_tokens=select(
+                    func.coalesce(
+                        func.sum(Trace.token_usage["total_tokens"].as_integer()), 0
+                    )
+                )
+                .where(Trace.run_id == run_id)
+                .scalar_subquery(),
+                span_count=select(func.count())
+                .select_from(Trace)
+                .where(Trace.run_id == run_id)
+                .scalar_subquery(),
+            )
+        )
 
     async def get_run_traces(self, run_id: str) -> list[Trace]:
         """Retrieve all traces for a given run.
@@ -339,6 +344,7 @@ class TraceService:
         span_type: Optional[str] = None,
         limit: int = 50,
         offset: int = 0,
+        cohort_id: str | None = None,
     ) -> list[Trace]:
         """List traces with optional filtering and pagination.
 
@@ -354,6 +360,14 @@ class TraceService:
         stmt = select(Trace)
         if run_id is not None:
             stmt = stmt.where(Trace.run_id == run_id)
+        if cohort_id is not None:
+            stmt = stmt.where(
+                Trace.run_id.in_(
+                    select(Run.id).where(
+                        Run.run_metadata["cohort_id"].as_string() == cohort_id
+                    )
+                )
+            )
         if span_type is not None:
             stmt = stmt.where(Trace.span_type == span_type)
         stmt = stmt.order_by(Trace.start_time.desc()).limit(limit).offset(offset)
@@ -373,3 +387,40 @@ class TraceService:
         stmt = select(Trace).where(Trace.id == trace_id)
         result = await self._session.execute(stmt)
         return result.scalar_one_or_none()
+
+
+def _same_saved_span(first: Trace, second: Trace) -> bool:
+    """Compare migrated rows against their retained safe content, not a made-up hash."""
+    fields = (
+        "run_id",
+        "span_id",
+        "parent_span_id",
+        "span_type",
+        "name",
+        "input_data",
+        "output_data",
+        "trace_metadata",
+        "start_time",
+        "end_time",
+        "duration_ms",
+        "cost_usd",
+        "token_usage",
+        "status",
+        "error",
+        "model",
+        "provider",
+        "feature",
+    )
+    for field in fields:
+        left, right = getattr(first, field), getattr(second, field)
+        if isinstance(left, datetime):
+            left = _normalize_utc(left)
+        if isinstance(right, datetime):
+            right = _normalize_utc(right)
+        if isinstance(left, (dict, list, str)):
+            left = bounded(left)
+        if isinstance(right, (dict, list, str)):
+            right = bounded(right)
+        if left != right:
+            return False
+    return True

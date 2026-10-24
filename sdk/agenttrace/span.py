@@ -25,6 +25,7 @@ class SpanStatus(str, Enum):
     STARTED = "started"
     COMPLETED = "completed"
     ERROR = "error"
+    CANCELLED = "cancelled"
 
 
 @dataclass
@@ -71,7 +72,10 @@ class Span:
         Args:
             output: The output data from the traced operation.
         """
-        self.output_data = output
+        if self.status in (SpanStatus.ERROR, SpanStatus.CANCELLED):
+            return
+        if output is not None:
+            self.output_data = output
         self.end_time = datetime.now(timezone.utc)
         self.duration_ms = (self.end_time - self.start_time).total_seconds() * 1000
         self.status = SpanStatus.COMPLETED

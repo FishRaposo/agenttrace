@@ -2,14 +2,26 @@
 
 from __future__ import annotations
 
+import asyncio
+import logging
 import uuid
+from contextvars import ContextVar
 from datetime import datetime, timezone
 from enum import Enum
+from threading import RLock, get_ident
 from typing import Any, Optional
 
+from agenttrace.capture import capture_snapshot
 from agenttrace.context import RunContext
 from agenttrace.exporters.base import BaseExporter
-from agenttrace.span import Span, SpanType
+from agenttrace.span import Span, SpanStatus, SpanType
+
+
+def _context_owner():
+    try:
+        return (get_ident(), asyncio.current_task())
+    except RuntimeError:
+        return (get_ident(), None)
 
 
 class RunStatus(str, Enum):
@@ -49,6 +61,10 @@ class _RunState:
         self.end_time: Optional[datetime] = None
         self.metadata: Optional[dict[str, Any]] = metadata
         self.spans: list[Span] = []
+        self.lock = RLock()
+        self.closed = False
+        self.owner = _context_owner()
+        self.exported_spans: set[str] = set()
 
     def to_dict(self) -> dict[str, Any]:
         """Convert run state to a dictionary for serialization.
@@ -87,12 +103,41 @@ class Tracer:
 
     _instance: Optional[Tracer] = None
 
-    def __init__(self, sample_rate: float = 1.0) -> None:
+    def __init__(
+        self, sample_rate: float = 1.0, *, capture_content: bool = False
+    ) -> None:
         self._exporter: Optional[BaseExporter] = None
-        self._current_run: Optional[_RunState] = None
-        self._span_stack: list[Span] = []
+        self._run_var: ContextVar[Optional[_RunState]] = ContextVar(
+            f"run-{id(self)}", default=None
+        )
+        self._stack_var: ContextVar[tuple[Span, ...]] = ContextVar(
+            f"stack-{id(self)}", default=()
+        )
+        self._tokens: ContextVar[Any] = ContextVar(f"tokens-{id(self)}", default=None)
+        self._sampled_var: ContextVar[bool] = ContextVar(
+            f"sampled-{id(self)}", default=True
+        )
+        self.capture_content = capture_content
         self._sample_rate = max(0.0, min(1.0, sample_rate))
-        self._sampled: bool = True
+
+    @property
+    def _current_run(self) -> Optional[_RunState]:
+        return self._run_var.get()
+
+    @property
+    def _span_stack(self) -> tuple[Span, ...]:
+        return self._stack_var.get()
+
+    def _export(self, kind: str, payload: dict[str, Any]) -> None:
+        if self._exporter is None or not self._sampled_var.get():
+            return
+        try:
+            safe = capture_snapshot(payload, capture_content=self.capture_content)
+            getattr(self._exporter, f"export_{kind}")(safe)
+        except Exception:
+            logging.getLogger(__name__).warning(
+                "Telemetry export failed", exc_info=True
+            )
 
     def set_exporter(self, exporter: BaseExporter) -> None:
         """Set the exporter used to write trace data.
@@ -128,17 +173,15 @@ class Tracer:
 
         run_id = str(uuid.uuid4())
         # Head-based deterministic sampling
-        self._sampled = self._is_sampled(run_id)
         run_state = _RunState(
             run_id=run_id, name=name, metadata=metadata, correlation_id=correlation_id
         )
-        self._current_run = run_state
-        RunContext.set_current_run(run_id, metadata)
-        if correlation_id:
-            RunContext.set_current_correlation_id(correlation_id)
-
-        if self._exporter is not None and self._sampled:
-            self._exporter.export_run(run_state.to_dict())
+        run_token = self._run_var.set(run_state)
+        stack_token = self._stack_var.set(())
+        sampled_token = self._sampled_var.set(self._is_sampled(run_id))
+        global_tokens = RunContext.bind(run_id, metadata, correlation_id)
+        self._tokens.set((run_token, stack_token, sampled_token, global_tokens))
+        self._export("run", run_state.to_dict())
 
         return _RunContext(tracer=self, run_state=run_state)
 
@@ -199,8 +242,11 @@ class Tracer:
             parent_span_id=parent_id,
         )
 
-        self._current_run.spans.append(span)
-        self._span_stack.append(span)
+        with self._current_run.lock:
+            if self._current_run.closed:
+                raise RuntimeError("Run is closed; late spans are rejected")
+            self._current_run.spans.append(span)
+        self._stack_var.set((*self._span_stack, span))
         RunContext.set_current_span(span)
 
         return span
@@ -217,11 +263,18 @@ class Tracer:
         if not self._span_stack or self._span_stack[-1].id != span.id:
             raise RuntimeError("Span mismatch. Spans must be ended in LIFO order.")
 
-        self._span_stack.pop()
-        RunContext.set_current_span(self._span_stack[-1] if self._span_stack else None)
-
-        if self._exporter is not None and self._sampled:
-            self._exporter.export_span(span.to_dict())
+        run = self._current_run
+        if run is None:
+            raise RuntimeError("Run is closed; late spans are rejected")
+        with run.lock:
+            if run.closed:
+                raise RuntimeError("Run is closed; late spans are rejected")
+            self._stack_var.set(self._span_stack[:-1])
+            RunContext.set_current_span(
+                self._span_stack[-1] if self._span_stack else None
+            )
+            self._export("span", span.to_dict())
+            run.exported_spans.add(span.id)
 
     def end_run(self, status: RunStatus = RunStatus.COMPLETED) -> None:
         """End the current run.
@@ -235,25 +288,57 @@ class Tracer:
         if self._current_run is None:
             raise RuntimeError("No active run to end.")
 
-        self._current_run.status = status
-        self._current_run.end_time = datetime.now(timezone.utc)
-
-        for span in self._span_stack:
-            if span.status.value == "started":
-                span.set_error("Run ended before span completed")
-
-        self._span_stack.clear()
-        RunContext.clear()
-
-        if self._exporter is not None and self._sampled:
-            self._exporter.export_run(self._current_run.to_dict())
-
-        self._current_run = None
+        run = self._current_run
+        if run.owner != _context_owner():
+            raise RuntimeError("Only the originating context can close its root")
+        tokens = self._tokens.get()
+        try:
+            with run.lock:
+                if run.closed:
+                    raise RuntimeError("Run is already closed")
+                run.status = status
+                run.end_time = datetime.now(timezone.utc)
+                for span in run.spans:
+                    if span.status == SpanStatus.STARTED:
+                        span.set_error("Run ended before span completed")
+                        if status == RunStatus.CANCELLED:
+                            span.status = SpanStatus.CANCELLED
+                    if span.id not in run.exported_spans:
+                        self._export("span", span.to_dict())
+                        run.exported_spans.add(span.id)
+                run.closed = True
+                self._export("run", run.to_dict())
+        finally:
+            if tokens:
+                run_token, stack_token, sampled_token, global_tokens = tokens
+                self._run_var.reset(run_token)
+                self._stack_var.reset(stack_token)
+                self._sampled_var.reset(sampled_token)
+                RunContext.restore(global_tokens)
+                self._tokens.set(None)
 
     def flush(self) -> None:
         """Flush any buffered trace data to the exporter."""
         if self._exporter is not None:
-            self._exporter.flush()
+            try:
+                self._exporter.flush()
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "Telemetry flush failed", exc_info=True
+                )
+
+    def close(self, timeout: float = 5.0) -> Optional[dict[str, Any]]:
+        """Stop bounded delivery; inline exporters retain synchronous flush."""
+        if self._exporter is not None and hasattr(self._exporter, "close"):
+            try:
+                return self._exporter.close(timeout=timeout)
+            except Exception:
+                logging.getLogger(__name__).warning(
+                    "Telemetry close failed", exc_info=True
+                )
+                return None
+        self.flush()
+        return None
 
     def add_event(self, event_type: str, payload: dict[str, Any]) -> None:
         """Log an event within the current run.
@@ -347,7 +432,13 @@ class _RunContext:
         return self._run_state
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
-        status = RunStatus.FAILED if exc_type is not None else RunStatus.COMPLETED
+        status = (
+            RunStatus.CANCELLED
+            if exc_type is not None and issubclass(exc_type, asyncio.CancelledError)
+            else RunStatus.FAILED
+            if exc_type is not None
+            else RunStatus.COMPLETED
+        )
         self._tracer.end_run(status=status)
 
 
@@ -375,17 +466,38 @@ class _SpanContext:
         self._span_type = span_type
         self._metadata = metadata
         self._span: Optional[Span] = None
+        self._root: Optional[_RunState] = None
 
     def __enter__(self) -> Span:
         self._span = self._tracer.start_span(
             name=self._name, span_type=self._span_type, metadata=self._metadata
         )
+        self._root = self._tracer._current_run
         return self._span
 
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
+        if self._span is not None and self._root is not None:
+            with self._root.lock:
+                if self._root.closed:
+                    # The owner already finalized/exported this unfinished child.
+                    # Automatic cleanup must preserve the application's outcome.
+                    stack = self._tracer._span_stack
+                    if stack and stack[-1] is self._span:
+                        self._tracer._stack_var.set(stack[:-1])
+                    if RunContext.get_current_run_id() == self._root.id:
+                        remaining = self._tracer._span_stack
+                        RunContext.set_current_span(
+                            remaining[-1] if remaining else None
+                        )
+                    return
+                self._finish(exc_type, exc_val)
+
+    def _finish(self, exc_type: Any, exc_val: Any) -> None:
         if self._span is not None:
             if exc_type is not None:
                 self._span.set_error(str(exc_val))
+                if issubclass(exc_type, asyncio.CancelledError):
+                    self._span.status = SpanStatus.CANCELLED
             else:
                 self._span.end()
             self._tracer.end_span(self._span)

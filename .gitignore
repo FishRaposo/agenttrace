@@ -41,3 +41,9 @@ dashboard/tsconfig.tsbuildinfo
 dashboard/playwright-report/
 dashboard/test-results/
 /.superpowers/sdd/
+
+.venv-sdk/
+.tmp/
+.pytest-temp*/
+
+pytest-cache-files*/

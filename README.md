@@ -4,14 +4,26 @@
 [![Python](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
 [![License](https://img.shields.io/badge/license-MIT-green)](LICENSE)
 
-Agent observability and replay SDK with cost attribution and prompt-cost reporting.
+**Find the failing step in an AI workflow, even when requests overlap.**
 
-AgentTrace is a self-hostable, offline-first portfolio project for inspecting
-agent runs. It records LLM calls, tool executions, decisions, input/output,
-latency, token usage, and cost, then exposes deterministic replay, run diffing,
-JSON OTLP interoperability, live updates, and a small dashboard. The default
-demo uses SQLite, an in-memory realtime publisher, and simulated providers; no
-credentials or network-backed evaluation are required.
+AgentTrace combines a dependency-free tracing SDK, a local collector and a
+visual investigation dashboard. Follow twenty overlapping requests, locate a
+retrieval failure, and compare its repair while the separate timeout and
+cancellation remain visible. Concurrency, HTTP export and persistence are real;
+bundled provider answers, usage and prices are synthetic.
+
+This is the **0.2.0 release candidate**. Capture defaults change to summaries;
+raw content requires explicit opt-in. See [capture/security](docs/SECURITY.md),
+[actual setup](docs/portfolio-connected.md), [case study](docs/portfolio-case-study.md),
+[verification](docs/portfolio-verification.md) and [review walkthrough](docs/portfolio-walkthrough.md).
+The CI badge tracks upstream `main`; the release candidate's verification is local.
+
+![Labeled sample investigation: a failed retrieval stage and its recorded error](docs/screenshots/sample-failure-1440.png)
+
+The [rendered gallery](docs/screenshots/README.md) also includes actual connected
+runs. Inspect the [raw connected proof](docs/evidence/connected/report.json) and
+[benchmark observations](docs/evidence/tracing-benchmark.json), or independently
+check their hashes/contracts with `make portfolio-evidence`.
 
 ## Quick demonstration
 
@@ -31,13 +43,22 @@ verifies checksums plus the committed golden result. See
 To run the local services separately:
 
 ```bash
-cd server && uvicorn app.main:app --reload --port 8000
-cd dashboard && npm run dev
+# See docs/portfolio-connected.md for a disposable DB and exact environment.
+python -m uvicorn app.main:app --app-dir server --host 127.0.0.1 --port 8300
+cd dashboard && npm run dev -- --hostname 127.0.0.1 --port 3404
 ```
 
-The API is available at `http://localhost:8000/docs` and the dashboard at
-`http://localhost:3000`. The dashboard has an explicit offline demo mode when
-the API is unavailable.
+The dedicated review API is `http://127.0.0.1:8300/docs`; the dashboard is
+`http://localhost:3404`. Configure `NEXT_PUBLIC_API_URL` before building it.
+Enable the bundled launcher explicitly with `PORTFOLIO_LAUNCH_ENABLED=true`.
+Connected failures show Retry and explicit sample entry.
+
+The dashboard and this installed SDK command run the same implementation:
+
+```bash
+python -m agenttrace.portfolio --scenario incident --endpoint http://127.0.0.1:8300
+python -m agenttrace.portfolio --scenario repaired --endpoint http://127.0.0.1:8300
+```
 
 ### Portfolio demo (dashboard only, no backend)
 
@@ -49,14 +70,19 @@ make demo-ui
 # or: cd dashboard && npm run demo:ui
 ```
 
-Open `http://localhost:3000`. The banner reads **Sample data — deterministic fixtures for portfolio review.**
+Open `http://localhost:3000`. The persistent label reads **Interactive sample data**.
 
 **Click path:**
 
-1. **Runs** → `demo-run-005` (`issue-to-draft-pr`) — span timeline with token use and cost on each step.
-2. **Replay** — deterministic step-through of the recorded run (draft-only, no GitHub call).
-3. **Diff** — compare against a second sample run to see what changed.
-4. **Costs** or **Live Tail** — attribution and tail from the same fixture set.
+1. **Investigate a failure** → separate request lanes → failed retrieval.
+2. Select its span and inspect the readable error, stage and correlation.
+3. Compare the repaired retrieval; timeout and cancellation remain separate.
+4. Inspect **Costs** and deterministic **recorded playback**, then **Reset demo**.
+5. Follow the actual-workflow link to reproduce with the SDK and collector.
+
+The preview makes no backend/provider requests and uses no network fonts.
+Playback never re-executes tools. Connected mode inspects actual saved spans and
+actual collector events with explicit delivery completeness and provenance.
 
 ## What is delivered
 

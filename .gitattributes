@@ -1,0 +1,6 @@
+# Evidence fixtures are hash-pinned; pin text files to LF bytes on every platform.
+docs/evidence/**/*.json   text eol=lf
+docs/evidence/**/*.sha256 text eol=lf
+dashboard/public/evidence/**/*.json   text eol=lf
+dashboard/public/evidence/**/*.sha256 text eol=lf
+dashboard/public/evidence/**/*.md     text eol=lf

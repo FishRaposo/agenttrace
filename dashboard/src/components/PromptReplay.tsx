@@ -33,6 +33,7 @@ function getStatusColor(status: SpanStatus): string {
   const colors: Record<SpanStatus, string> = {
     completed: "text-green-600",
     error: "text-red-600",
+    cancelled: "text-gray-600",
     started: "text-blue-600",
   };
   return colors[status];

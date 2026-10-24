@@ -1,7 +1,7 @@
 PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
 NPM    := npm
 
-.PHONY: install dev demo-ui test sdk-test server-test dashboard-test lint format typecheck \
+.PHONY: install dev demo-ui portfolio-workload portfolio-verify portfolio-benchmark test sdk-test server-test dashboard-test lint format typecheck \
         evidence forbidden-scan package docker-up docker-down demo clean help
 
 install: ## Install the SDK, self-contained server, and dashboard deps
@@ -56,6 +56,18 @@ docker-down: ## Stop all containers
 
 demo: ## Run the offline SDK tracing demo (JSONL export)
 	$(PYTHON) examples/run_demo.py
+
+portfolio-workload: ## Run the packaged synthetic workload against a local collector on8300
+	$(PYTHON) -m agenttrace.portfolio --scenario incident --endpoint http://127.0.0.1:8300
+
+portfolio-verify: ## Verify real local workload, persistence and recorded playback
+	$(PYTHON) scripts/verify_connected_portfolio.py
+
+portfolio-evidence: ## Verify committed connected observations and benchmark offline
+	$(PYTHON) scripts/verify_connected_evidence.py --connected docs/evidence/connected/report.json --benchmark docs/evidence/tracing-benchmark.json
+
+portfolio-benchmark: ## Measure against a dedicated collector configured at100000requests/minute
+	$(PYTHON) scripts/benchmark_portfolio_tracing.py --collector-rate-limit 100000
 
 clean: ## Remove caches
 	$(PYTHON) -c "import shutil, pathlib; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('__pycache__')]; [shutil.rmtree(p, ignore_errors=True) for p in pathlib.Path('.').rglob('.pytest_cache')]; shutil.rmtree('.ruff_cache', ignore_errors=True)"

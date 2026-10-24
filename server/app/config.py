@@ -16,15 +16,20 @@ class Settings(BaseAppConfig):
 
     DATABASE_URL: str = "sqlite+aiosqlite:///./data/agenttrace.db"
     DATABASE_TYPE: str = "sqlite"
-    SERVER_HOST: str = "0.0.0.0"
+    SERVER_HOST: str = "127.0.0.1"
     SERVER_PORT: int = 8000
     MAX_TRACE_RETENTION_DAYS: int = 30
     BUFFER_SIZE: int = 100
-    CORS_ORIGINS: list[str] = ["*"]
+    CORS_ORIGINS: list[str] = ["http://localhost:3404", "http://127.0.0.1:3404"]
     SECRET_KEY: str = "your-secret-key-change-in-production"
     ENVIRONMENT: str = "development"
     AUTH_REQUIRED: bool = False
     REALTIME_BACKEND: str = "memory"
+    PORTFOLIO_LAUNCH_ENABLED: bool = False
+    PORTFOLIO_COLLECTOR_URL: str = "http://127.0.0.1:8300"
+    PORTFOLIO_AUTH_TOKEN: str | None = None
+    RATE_LIMIT_REQUESTS: int = Field(default=100, ge=1)
+    RATE_LIMIT_WINDOW_SECONDS: int = Field(default=60, ge=1)
     TRACE_SAMPLING_MODE: str = "off"
     TRACE_SAMPLE_RATE: float = Field(default=1.0, ge=0.0, le=1.0)
     TRACE_TAIL_SLOW_MS: float | None = Field(default=None, ge=0.0)

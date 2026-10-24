@@ -37,13 +37,13 @@ describe("DemoModeBanner", () => {
     expect(banner).toHaveAttribute("role", "status");
   });
 
-  it("renders shorter outage copy when backend fallback activates demo mode", () => {
+  it("labels explicitly selected sample data without claiming a connection failure", () => {
     mockActive = true;
     mockForced = false;
     render(<DemoModeBanner />);
     const banner = screen.getByTestId("demo-mode-banner");
     expect(banner).toHaveAttribute("data-demo-forced", "false");
-    expect(banner).toHaveTextContent(/backend offline/i);
+    expect(banner).not.toHaveTextContent(/backend offline/i);
     expect(banner).toHaveTextContent(/sample data/i);
   });
 });

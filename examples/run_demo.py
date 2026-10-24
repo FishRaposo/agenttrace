@@ -12,13 +12,15 @@ import time
 from pathlib import Path
 
 from agenttrace import Tracer
+from agenttrace.exporters.bounded import BoundedExporter
 from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.wrappers import trace_llm, trace_tool
 
 OUTPUT = Path(__file__).resolve().parent.parent / "data" / "demo_traces.jsonl"
 
 tracer = Tracer()
-tracer.set_exporter(JSONLExporter(str(OUTPUT), buffer_size=1))
+delivery = BoundedExporter(JSONLExporter(str(OUTPUT), buffer_size=1))
+tracer.set_exporter(delivery)
 
 
 @trace_tool(tracer, tool_name="retrieve")
@@ -54,7 +56,9 @@ def main() -> None:
         docs = retrieve("vector databases")
         result = answer("vector databases", docs)
         print(f"answer: {result['answer']}")
-    tracer.flush()
+    result_delivery = delivery.close(timeout=5.0)
+    if not result_delivery["complete"]:
+        raise RuntimeError(f"Incomplete local telemetry: {result_delivery}")
 
     records = [
         json.loads(line)

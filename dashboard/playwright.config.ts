@@ -1,43 +1,31 @@
-import { defineConfig, devices } from "@playwright/test";
-
-const port = process.env.PLAYWRIGHT_PORT ?? "3000";
-
+import { defineConfig } from "@playwright/test";
+const port = process.env.PLAYWRIGHT_PORT ?? "3404";
 export default defineConfig({
   testDir: "./e2e",
-  fullyParallel: true,
-  forbidOnly: !!process.env.CI,
-  retries: process.env.CI ? 2 : 0,
-  // The offline demo fixture and Next dev compiler share one process. A
-  // serial browser gate avoids cross-worker route/HMR races while preserving
-  // the same deterministic smoke contract locally and in CI.
+  testIgnore: "**/connected*.spec.ts",
+  fullyParallel: false,
   workers: 1,
-  reporter: "html",
+  timeout: 60000,
+  expect: { timeout: 10000 },
+  forbidOnly: !!process.env.CI,
+  retries: 0,
+  reporter: "line",
   use: {
     baseURL: `http://localhost:${port}`,
-    trace: "on-first-retry",
+    viewport: { width: 1440, height: 900 },
+    trace: "retain-on-failure",
     launchOptions: process.env.PLAYWRIGHT_EXECUTABLE_PATH
       ? { executablePath: process.env.PLAYWRIGHT_EXECUTABLE_PATH }
       : undefined,
   },
-
-  projects: [
-    {
-      name: "chromium",
-      use: { ...devices["Desktop Chrome"] },
-    },
-    {
-      name: "firefox",
-      use: { ...devices["Desktop Firefox"] },
-    },
-    {
-      name: "webkit",
-      use: { ...devices["Desktop Safari"] },
-    },
-  ],
-
-  webServer: {
-    command: `npm run dev -- --port ${port}`,
-    url: `http://localhost:${port}`,
-    reuseExistingServer: !process.env.CI,
-  },
+  projects: [{ name: "chromium", use: { browserName: "chromium" } }],
+  webServer:
+    process.env.PLAYWRIGHT_EXTERNAL_SERVER === "1"
+      ? undefined
+      : {
+          command: `npm run start -- --hostname 127.0.0.1 --port ${port}`,
+          url: `http://localhost:${port}`,
+          reuseExistingServer: false,
+          timeout: 60000,
+        },
 });

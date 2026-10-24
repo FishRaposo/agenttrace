@@ -1,10 +1,9 @@
 /**
  * Demo-mode fixtures.
  *
- * When the AgentTrace backend is unreachable, the API client falls back to this
- * deterministic in-memory dataset so the dashboard remains fully explorable with
- * no server running (useful for previews, screenshots, and offline development).
- * A visible banner is shown whenever demo data is being served.
+ * Historical deterministic fixtures retained for compatibility and tests.
+ * The application selects sample mode explicitly; network failure never
+ * activates these fixtures. The portfolio experience uses demo-scenarios.ts.
  */
 
 import type {

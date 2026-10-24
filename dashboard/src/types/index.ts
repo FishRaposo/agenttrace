@@ -29,7 +29,7 @@ export type RunStatus = "running" | "completed" | "failed" | "cancelled";
 
 export type SpanType = "llm_call" | "tool_call" | "decision" | "retrieval" | "custom";
 
-export type SpanStatus = "started" | "completed" | "error";
+export type SpanStatus = "started" | "completed" | "error" | "cancelled";
 
 export interface Run {
   id: string;
@@ -70,6 +70,7 @@ export interface Span {
 }
 
 export interface TraceResponse {
+  delivery_cursor?: number;
   id: string;
   run_id: string;
   span_id: string;
@@ -174,6 +175,8 @@ export interface HealthResponse {
 }
 
 export interface RunDiff {
+  compatibility?: { compatible: boolean | null; reason: string };
+  aligned_stages?: Array<{ stage_key: string; occurrence: number; attempt: number; name: string; status_1: string | null; status_2: string | null; status_changed: boolean }>;
   run1: {
     id: string;
     name: string;

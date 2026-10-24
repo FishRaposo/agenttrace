@@ -1,5 +1,20 @@
 # Changelog
 
+## 2026-10-24 — in-place portfolio audit and publish preparation
+
+- normalized hash-pinned evidence fixtures to LF bytes via `.gitattributes` and
+  re-pinned `docs/evidence/**` and `dashboard/public/evidence/**` digests so the
+  connected-evidence verifier passes on LF checkouts (Linux/macOS CI);
+- added the `connected-live` hosted CI job: a disposable loopback collector
+  plus production dashboard running the HTTP integrity/persistence verifiers
+  and the connected Playwright suite on Linux;
+- added an axe-core WCAG 2.1 A/AA Playwright suite (8 scans) and repaired two
+  real `label-content-name-mismatch` defects: run-lane links whose accessible
+  name omitted visible text, and the theme toggle whose label did not contain
+  its visible state;
+- added Open Graph/Twitter metadata alongside the existing app icon; cleared
+  the last dev-chain `zod` advisory in range (npm audit now reports zero).
+
 ## 2026-08-16 — issue-to-draft-PR safety absorption
 
 - added the dependency-free `agenttrace.issue_pr` SDK package with deterministic

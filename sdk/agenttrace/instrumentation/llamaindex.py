@@ -118,6 +118,7 @@ class LlamaIndexInstrumentor(Instrumentor):
             Settings.callback_manager.add_handler(self._handler)
         else:
             Settings.callback_manager = CallbackManager([self._handler])
+        self._prepare_delivery(self.tracer)
         self._instrumented = True
 
     def uninstrument(self) -> None:

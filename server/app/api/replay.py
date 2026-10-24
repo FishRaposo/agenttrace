@@ -9,6 +9,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.auth import User, require_roles
+from app.core.capture import bounded, sanitize
 from app.db import get_session
 from app.internal.rbac import Role
 from app.models.run import Run
@@ -53,26 +54,28 @@ async def get_replay_data(
     for span in spans:
         step = {
             "id": span.id,
-            "name": span.name,
+            "name": sanitize(span.name),
             "span_type": span.span_type,
-            "input_data": span.input_data,
-            "output_data": span.output_data,
-            "metadata": span.trace_metadata,
+            "input_data": bounded(span.input_data),
+            "output_data": bounded(span.output_data),
+            "metadata": bounded(span.trace_metadata),
             "start_time": span.start_time.isoformat(),
             "end_time": span.end_time.isoformat() if span.end_time else None,
             "status": span.status,
-            "error": span.error,
+            "error": sanitize(span.error),
         }
         replay_steps.append(step)
 
     return {
+        "playback_mode": "recorded",
+        "reexecution": False,
         "run": {
             "id": run.id,
-            "name": run.name,
+            "name": sanitize(run.name),
             "status": run.status,
             "start_time": run.start_time.isoformat(),
             "end_time": run.end_time.isoformat() if run.end_time else None,
-            "metadata": run.run_metadata,
+            "metadata": bounded(run.run_metadata),
         },
         "steps": replay_steps,
         "total_steps": len(replay_steps),
