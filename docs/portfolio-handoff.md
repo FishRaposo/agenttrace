@@ -10,9 +10,10 @@ A 2026-10-24 in-place audit (see the dated verification section) normalized
 hash-pinned evidence to LF, added the `connected-live` hosted CI job and an
 axe WCAG suite that repaired two real accessible-name defects, added OG/Twitter
 metadata, and cleared the last dev-chain advisory — all delivery gates were
-re-verified unchanged. The branch is published under the same push → PR →
-merge-when-green protocol as projects 02–03; hosted run identifiers are
-recorded in the dated verification section and the parent index.
+re-verified unchanged. [PR #21](https://github.com/FishRaposo/agenttrace/pull/21)
+merged to `main` 2026-10-24 (merge `e645eae`); all nine hosted jobs passed on
+the first run, including the new connected real-process job and the LF-pinned
+evidence verification on Linux.
 
 ## Read in this order
 

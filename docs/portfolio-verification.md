@@ -206,6 +206,10 @@ collector URL found no additional defects.
 
 Limits unchanged: no native/model/human claims, no Docker/PostgreSQL
 verification locally (the docker-build job is exercised by hosted CI only),
-no formal accessibility certification. **Hosted status:** pending — this audit
-commits ahead of the first push; PR and hosted-run identifiers are recorded
-in the project handoff and parent index after merge.
+no formal accessibility certification. **Hosted status:** [PR #21](https://github.com/FishRaposo/agenttrace/pull/21)
+merged 2026-10-24 (merge `e645eae`) with all nine jobs green on the first
+run — lint, SDK, server, offline evidence (on LF bytes), dashboard build,
+wheel isolation, Docker build, and the new `connected-live` job running the
+HTTP integrity verifiers and connected Playwright suite against a real
+collector on Linux. Post-merge `main` run identifiers are recorded in the
+parent index.
