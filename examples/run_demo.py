@@ -16,7 +16,7 @@ from agenttrace.exporters.bounded import BoundedExporter
 from agenttrace.exporters.jsonl import JSONLExporter
 from agenttrace.wrappers import trace_llm, trace_tool
 
-OUTPUT = Path(__file__).resolve().parent.parent / "data" / "demo_traces.jsonl"
+OUTPUT = Path(__file__).resolve().parent.parent / ".tmp" / "demo_traces.jsonl"
 
 tracer = Tracer()
 delivery = BoundedExporter(JSONLExporter(str(OUTPUT), buffer_size=1))
