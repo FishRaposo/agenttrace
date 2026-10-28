@@ -17,6 +17,9 @@ raw content requires explicit opt-in. See [capture/security](docs/SECURITY.md),
 [actual setup](docs/portfolio-connected.md), [case study](docs/portfolio-case-study.md),
 [verification](docs/portfolio-verification.md) and [review walkthrough](docs/portfolio-walkthrough.md).
 The CI badge tracks upstream `main`; the release candidate's verification is local.
+(GitHub's aggregate commit status on `main` can read "pending"/"failure" from stale
+Dependabot-only contexts; the workflow's own checks — lint, dashboard build, Docker,
+connected, forbidden-scan — are the CI signal and are green.)
 
 ![Labeled sample investigation: a failed retrieval stage and its recorded error](docs/screenshots/sample-failure-1440.png)
 
