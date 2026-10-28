@@ -145,6 +145,63 @@ def test_child_cannot_close_parent_root_or_leave_it_unusable():
     asyncio.run(main())
 
 
+@pytest.mark.parametrize("propagation", ["task", "thread"])
+def test_inherited_context_cannot_end_another_contexts_span(propagation):
+    tracer, recorder = Tracer(), Recorder()
+    tracer.set_exporter(recorder)
+
+    def attempt(parent):
+        with pytest.raises(RuntimeError, match="originating context"):
+            tracer.end_span(parent)
+        with tracer.span("owned-child") as child:
+            assert child.parent_span_id == parent.id
+
+    async def main():
+        with tracer.run("root"):
+            with tracer.span("parent") as parent:
+                if propagation == "task":
+
+                    async def child():
+                        attempt(parent)
+
+                    await asyncio.create_task(child())
+                else:
+                    with ThreadPoolExecutor(1) as pool:
+                        await asyncio.wrap_future(
+                            pool.submit(copy_context().run, attempt, parent)
+                        )
+                assert parent.status.value == "started"
+                assert [span["name"] for span in recorder.spans] == ["owned-child"]
+        assert [span["name"] for span in recorder.spans] == ["owned-child", "parent"]
+        assert len({span["id"] for span in recorder.spans}) == 2
+
+    asyncio.run(main())
+
+
+def test_inherited_context_manager_exit_cannot_mutate_parent_span():
+    tracer, recorder = Tracer(), Recorder()
+    tracer.set_exporter(recorder)
+
+    async def main():
+        with tracer.run("root"):
+            context = tracer.span("parent")
+            with context as parent:
+                before = parent.to_dict()
+
+                async def child():
+                    with pytest.raises(RuntimeError, match="originating context"):
+                        context.__exit__(
+                            ValueError, ValueError("foreign failure"), None
+                        )
+
+                await asyncio.create_task(child())
+                assert parent.to_dict() == before
+        assert recorder.spans[0]["status"] == "completed"
+        assert len(recorder.spans) == 1
+
+    asyncio.run(main())
+
+
 def test_sampling_is_isolated_across_overlapping_roots():
     recorder = Recorder()
     tracer = Tracer()

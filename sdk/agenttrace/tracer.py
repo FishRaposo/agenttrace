@@ -65,6 +65,7 @@ class _RunState:
         self.closed = False
         self.owner = _context_owner()
         self.exported_spans: set[str] = set()
+        self.span_owners: dict[str, Any] = {}
 
     def to_dict(self) -> dict[str, Any]:
         """Convert run state to a dictionary for serialization.
@@ -246,6 +247,7 @@ class Tracer:
             if self._current_run.closed:
                 raise RuntimeError("Run is closed; late spans are rejected")
             self._current_run.spans.append(span)
+            self._current_run.span_owners[span.id] = _context_owner()
         self._stack_var.set((*self._span_stack, span))
         RunContext.set_current_span(span)
 
@@ -269,6 +271,10 @@ class Tracer:
         with run.lock:
             if run.closed:
                 raise RuntimeError("Run is closed; late spans are rejected")
+            if run.span_owners.get(span.id) != _context_owner():
+                raise RuntimeError("Only the originating context can end its span")
+            if span.id in run.exported_spans:
+                raise RuntimeError("Span is already ended")
             self._stack_var.set(self._span_stack[:-1])
             RunContext.set_current_span(
                 self._span_stack[-1] if self._span_stack else None
@@ -478,6 +484,8 @@ class _SpanContext:
     def __exit__(self, exc_type: Any, exc_val: Any, exc_tb: Any) -> None:
         if self._span is not None and self._root is not None:
             with self._root.lock:
+                if self._root.span_owners.get(self._span.id) != _context_owner():
+                    raise RuntimeError("Only the originating context can end its span")
                 if self._root.closed:
                     # The owner already finalized/exported this unfinished child.
                     # Automatic cleanup must preserve the application's outcome.
