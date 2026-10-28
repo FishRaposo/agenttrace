@@ -273,6 +273,10 @@ protobuf/gRPC, and mandatory Redis/PostgreSQL/Grafana services remain deferred.
 Live GitHub/LLM providers and server-hosted issue-to-PR automation are also
 deferred. No changes are required in `aria-agent` or any other repository.
 
+## Part of the stack
+
+[groundtruth](https://github.com/FishRaposo/groundtruth) · [evalforge](https://github.com/FishRaposo/evalforge) · [llm-gateway](https://github.com/FishRaposo/llm-gateway) · [aria-agent](https://github.com/FishRaposo/aria-agent) · [WCP-Compliance-Agent-V5](https://github.com/FishRaposo/WCP-Compliance-Agent-V5)
+
 ## License and provenance
 
 AgentTrace is released under the MIT license. The server's vendored compatibility
