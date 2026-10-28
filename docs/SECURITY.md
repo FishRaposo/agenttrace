@@ -22,7 +22,7 @@ memory and performs no network request.
 
 ## Authentication and roles
 
-Passwords are bcrypt-hashed and JWT bearer tokens expire according to
+Passwords are PBKDF2-SHA256-hashed and JWT bearer tokens expire according to
 `ACCESS_TOKEN_EXPIRE_MINUTES`. The first local startup seeds `admin` / `admin123`
 for the offline demo; replace or remove it before deployment.
 
@@ -31,6 +31,13 @@ observability data, `ingestor` can additionally write runs/traces/OTLP, and
 `admin` can delete runs, manage alert rules, and read audit logs. When auth is
 optional, only a request with no token receives the synthetic offline identity;
 invalid tokens still fail with `401`.
+
+Legacy `/ws/traces` and `/ws/metrics` readers apply the same viewer role boundary
+before accepting a connection. Header-capable clients supply an `Authorization:
+Bearer ...` header; credentials in URLs are not supported. A supplied browser
+Origin must match `CORS_ORIGINS`; clients without an Origin still require a valid
+identity when auth is required. The browser dashboard uses the protected SSE
+route. Credential-free local WebSocket clients remain available in offline mode.
 
 ## Secrets and redaction
 

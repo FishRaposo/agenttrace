@@ -51,7 +51,7 @@ async def init_db() -> None:
         from app.auth import get_password_hash
         from app.models.user import User
 
-        result = await session.execute(select(User))
+        result = await session.execute(select(User.id).limit(1))
         if result.scalar_one_or_none() is None:
             demo = User(
                 username="admin",

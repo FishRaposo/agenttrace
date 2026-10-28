@@ -9,9 +9,13 @@ from __future__ import annotations
 import json
 from typing import Any
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi import APIRouter, HTTPException, WebSocket, WebSocketDisconnect
+from fastapi.security.utils import get_authorization_scheme_param
 
+from app.api.auth import get_current_user, require_roles
 from app.config import settings
+from app.db import async_session_factory
+from app.internal.rbac import Role
 from app.internal.realtime import RealtimePublisher, create_publisher
 
 router = APIRouter()
@@ -21,6 +25,30 @@ publisher: RealtimePublisher = create_publisher(
 
 # Store active connections
 connections: dict[str, list[WebSocket]] = {}
+_reader_access = require_roles(Role.VIEWER)
+
+
+async def _authorize_reader(websocket: WebSocket) -> bool:
+    """Authorize before accepting or subscribing; credentials stay out of URLs."""
+    origin = websocket.headers.get("origin")
+    if origin is not None and origin not in settings.CORS_ORIGINS:
+        await websocket.close(code=1008)
+        return False
+    authorization = websocket.headers.get("authorization")
+    scheme, token = get_authorization_scheme_param(authorization)
+    if authorization is not None and (scheme.lower() != "bearer" or not token):
+        await websocket.close(code=1008)
+        return False
+    user = None
+    try:
+        if token:
+            async with async_session_factory() as session:
+                user = await get_current_user(token=token, session=session)
+        await _reader_access(current_user=user, raw_token=token or None)
+    except HTTPException:
+        await websocket.close(code=1008)
+        return False
+    return True
 
 
 @router.websocket("/ws/traces")
@@ -29,6 +57,8 @@ async def traces_websocket(websocket: WebSocket) -> None:
 
     Clients connect here to receive live trace updates.
     """
+    if not await _authorize_reader(websocket):
+        return
     await websocket.accept()
 
     # Add to connections
@@ -92,6 +122,8 @@ async def metrics_websocket(websocket: WebSocket) -> None:
 
     Streams aggregated metrics (QPS, latency, cost) in real-time.
     """
+    if not await _authorize_reader(websocket):
+        return
     await websocket.accept()
 
     _client_id = str(id(websocket))
