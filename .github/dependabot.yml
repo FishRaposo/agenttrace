@@ -98,6 +98,9 @@ updates:
       # vitest 5 forks pool crashes on the CI Node 20 runtime; pinned ^4.
       - dependency-name: vitest
         update-types: ["version-update:semver-major"]
+      # jsdom 30 crashes vitest fork workers on CI Node 20 ('bind' error); pinned ^24.
+      - dependency-name: jsdom
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
