@@ -36,8 +36,6 @@ pytest-cov==7.1.0
     # via agenttrace (pyproject.toml)
 ruff==0.17.2
     # via agenttrace (pyproject.toml)
-tomli==2.5.0 ; python_full_version <= '3.11'
-    # via coverage
 typing-extensions==4.16.0
     # via
     #   mypy
