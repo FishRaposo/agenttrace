@@ -1,13 +1,18 @@
 PYTHON := $(shell command -v python3 2>/dev/null || command -v python 2>/dev/null)
 NPM    := npm
 
-.PHONY: install dev demo-ui portfolio-workload portfolio-verify portfolio-benchmark test sdk-test server-test dashboard-test lint format typecheck \
+.PHONY: install lock dev demo-ui portfolio-workload portfolio-verify portfolio-benchmark test sdk-test server-test dashboard-test lint format typecheck \
         evidence forbidden-scan package docker-up docker-down demo clean help
 
-install: ## Install the SDK, self-contained server, and dashboard deps
-	$(PYTHON) -m pip install -e "sdk[dev]"
-	$(PYTHON) -m pip install -e "server[dev]"
+install: ## Install the SDK, self-contained server, and dashboard deps from lockfiles
+	$(PYTHON) -m pip install -r server/requirements-lock.txt
+	$(PYTHON) -m pip install --no-deps -e sdk -e server
 	cd dashboard && $(NPM) ci
+
+lock: ## Regenerate the Python lockfiles (requires uv; keeps existing pins unless inconsistent)
+	cd sdk && uv pip compile pyproject.toml --extra dev --python-version 3.11 --universal -o requirements-lock.txt
+	cd server && uv pip compile pyproject.toml --extra dev --python-version 3.11 --universal -c ../sdk/requirements-lock.txt -o requirements-lock.txt
+	cd server && uv pip compile pyproject.toml --python-version 3.11 --universal -c requirements-lock.txt -o requirements.txt
 
 dev: ## Run the collector server locally (uvicorn on :8000)
 	cd server && uvicorn app.main:app --reload --port 8000
