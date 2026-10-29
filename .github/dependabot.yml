@@ -95,6 +95,9 @@ updates:
         update-types: ["version-update:semver-major"]
       - dependency-name: ioredis
         update-types: ["version-update:semver-major"]
+      # vitest 5 forks pool crashes on the CI Node 20 runtime; pinned ^4.
+      - dependency-name: vitest
+        update-types: ["version-update:semver-major"]
 
   - package-ecosystem: github-actions
     directory: /
