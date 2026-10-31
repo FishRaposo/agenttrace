@@ -33,10 +33,21 @@ check their hashes/contracts with `make portfolio-evidence`.
 From the repository root (use `python3` if `python` is not on your PATH; `make`
 auto-selects `python3` when available):
 
+Minimum requirements: Python + Node.js only — no Docker, PostgreSQL, Redis,
+credentials, or `make` for the default path (SQLite + in-memory realtime).
+The server/dashboard Dockerfiles and `docker-compose.yml` are optional
+expansions for the shared-infra profile.
+
 ```bash
 make install       # SDK + server dev extras + dashboard lockfile install
 make demo          # dependency-free SDK JSONL example
 make evidence      # deterministic server-side portfolio evidence bundle
+
+# without make:
+#   python -m pip install -r server/requirements-lock.txt
+#   python -m pip install --no-deps -e sdk -e server && cd dashboard && npm ci
+#   python examples/run_demo.py
+#   python scripts/portfolio_demo.py && python scripts/verify_portfolio_evidence.py
 ```
 
 The evidence command writes ignored files under `artifacts/portfolio/` and
