@@ -10,11 +10,11 @@ iniconfig==2.3.1
     # via pytest
 librt==0.16.0 ; platform_python_implementation != 'PyPy'
     # via mypy
-mypy==2.4.0
+mypy==2.4.1
     # via agenttrace (pyproject.toml)
 mypy-extensions==1.1.0
     # via mypy
-nodeenv==1.11.0
+nodeenv==1.11.1
     # via pyright
 packaging==26.3
     # via pytest
@@ -28,13 +28,13 @@ pygments==2.21.0
     # via pytest
 pyright==1.1.414
     # via agenttrace (pyproject.toml)
-pytest==9.1.1
+pytest==9.2.0
     # via
     #   agenttrace (pyproject.toml)
     #   pytest-cov
 pytest-cov==7.1.0
     # via agenttrace (pyproject.toml)
-ruff==0.17.2
+ruff==0.17.3
     # via agenttrace (pyproject.toml)
 typing-extensions==4.16.0
     # via
