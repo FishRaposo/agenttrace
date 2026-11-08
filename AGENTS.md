@@ -19,7 +19,7 @@ agenttrace/
 │   └── migrations/ Dockerfile pyproject.toml requirements.txt
 ├── dashboard/                    # Next.js dashboard with offline demo fixtures
 ├── examples/ scripts/ docs/      # demos, evidence tooling, and project documentation
-├── Makefile ruff.toml pyrightconfig.json
+├── ruff.toml pyrightconfig.json
 └── .github/workflows/ci.yml
 ```
 
@@ -48,19 +48,22 @@ aliases stable. Do not modify `aria-agent` for this integration.
 ## Commands
 
 ```bash
-make install      # install SDK/server dev extras and dashboard with npm ci
-make test         # SDK + server tests
-make sdk-test     # standalone SDK tests
-make server-test  # server tests
-make dashboard-test
-make lint         # Ruff check
-make format       # Ruff format
-make typecheck    # Pyright
-make evidence     # deterministic offline portfolio evidence
-make forbidden-scan
-make package      # build SDK and server wheels
-make docker-up    # optional PostgreSQL + Redis + server + dashboard
-make demo         # offline SDK tracing demo
+python -m pip install -r server/requirements-lock.txt  # install
+python -m pip install --no-deps -e sdk -e server
+(cd dashboard && npm ci)
+(cd sdk && python -m pytest -q)          # standalone SDK tests
+(cd server && python -m pytest -q)       # server tests
+(cd dashboard && npx playwright test --project=chromium)
+ruff check server/app sdk/agenttrace examples server/tests sdk/tests
+ruff format server/app sdk/agenttrace examples server/tests sdk/tests
+python -m pyright server/app sdk/agenttrace
+python scripts/portfolio_demo.py         # deterministic offline evidence
+python scripts/verify_portfolio_evidence.py
+python scripts/check_forbidden_dependencies.py
+python -m pip install build && python -m build sdk && python -m build server
+python scripts/check_wheel_contents.py
+docker compose up -d                     # optional PostgreSQL + Redis + app
+python examples/run_demo.py              # offline SDK tracing demo
 ```
 
 The default path uses SQLite, in-memory realtime publication, bundled demo data,
@@ -101,5 +104,5 @@ in roadmap and security documentation.
 
 - SDK public API or standalone dependency changes;
 - server compatibility, sampling, alert, RBAC, audit, or OTLP behavior changes;
-- Makefile targets, Docker Compose services, package metadata, or CI changes;
+- Docker Compose services, package metadata, or CI changes;
 - a new deferred boundary or provenance source is introduced.

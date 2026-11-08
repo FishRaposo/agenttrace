@@ -17,7 +17,6 @@ EXCLUDED_PARTS = {".git", "__pycache__", "node_modules", ".next", "artifacts"}
 TARGETS = (
     "server",
     "sdk",
-    "Makefile",
     ".github",
     "Dockerfile",
     "docker-compose.yml",

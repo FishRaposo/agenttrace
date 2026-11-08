@@ -32,28 +32,24 @@ connected, forbidden-scan — are the CI signal and are green.)
 The [rendered gallery](docs/screenshots/README.md) also includes actual connected
 runs. Inspect the [raw connected proof](docs/evidence/connected/report.json) and
 [benchmark observations](docs/evidence/tracing-benchmark.json), or independently
-check their hashes/contracts with `make portfolio-evidence`.
+check their hashes/contracts with `python scripts/verify_connected_evidence.py --connected docs/evidence/connected/report.json --benchmark docs/evidence/tracing-benchmark.json`.
 
 ## Quick demonstration
 
-From the repository root (use `python3` if `python` is not on your PATH; `make`
-auto-selects `python3` when available):
+From the repository root (use `python3` if `python` is not on your PATH):
 
-Minimum requirements: Python + Node.js only — no Docker, PostgreSQL, Redis,
-credentials, or `make` for the default path (SQLite + in-memory realtime).
+Minimum requirements: Python + Node.js only — no Docker, PostgreSQL, Redis or
+credentials for the default path (SQLite + in-memory realtime).
 The server/dashboard Dockerfiles and `docker-compose.yml` are optional
 expansions for the shared-infra profile.
 
 ```bash
-make install       # SDK + server dev extras + dashboard lockfile install
-make demo          # dependency-free SDK JSONL example
-make evidence      # deterministic server-side portfolio evidence bundle
-
-# without make:
-#   python -m pip install -r server/requirements-lock.txt
-#   python -m pip install --no-deps -e sdk -e server && cd dashboard && npm ci
-#   python examples/run_demo.py
-#   python scripts/portfolio_demo.py && python scripts/verify_portfolio_evidence.py
+python -m pip install -r server/requirements-lock.txt
+python -m pip install --no-deps -e sdk -e server
+(cd dashboard && npm ci)
+python examples/run_demo.py
+python scripts/portfolio_demo.py
+python scripts/verify_portfolio_evidence.py
 ```
 
 The evidence command writes ignored files under `artifacts/portfolio/` and
@@ -86,8 +82,7 @@ For reviewers who only need the UI — deterministic fixtures, no server, no
 credentials:
 
 ```bash
-make demo-ui
-# or: cd dashboard && npm run demo:ui
+(cd dashboard && npm run demo:ui)
 ```
 
 Open `http://localhost:3000`. The persistent label reads **Interactive sample data**.
@@ -166,15 +161,15 @@ Useful targets:
 
 | Command | Purpose |
 | --- | --- |
-| `make test` | SDK and server pytest suites |
-| `make lint` | Ruff checks |
-| `make format` | Ruff formatting |
-| `make typecheck` | Pyright for SDK and server |
-| `make demo-ui` | Dashboard in forced portfolio demo mode (no backend) |
-| `make evidence` | Build and verify the offline evidence bundle |
-| `make forbidden-scan` | Check for retired external dependency references |
-| `make package` | Build both Python wheels |
-| `make dashboard-test` | Chromium Playwright smoke test |
+| `(cd sdk && python -m pytest -q)` + `(cd server && python -m pytest -q)` | SDK and server pytest suites |
+| `ruff check server/app sdk/agenttrace examples server/tests sdk/tests` | Ruff checks |
+| `ruff format server/app sdk/agenttrace examples server/tests sdk/tests` | Ruff formatting |
+| `python -m pyright server/app sdk/agenttrace` | Pyright for SDK and server |
+| `(cd dashboard && npm run demo:ui)` | Dashboard in forced portfolio demo mode (no backend) |
+| `python scripts/portfolio_demo.py` + `python scripts/verify_portfolio_evidence.py` | Build and verify the offline evidence bundle |
+| `python scripts/check_forbidden_dependencies.py` | Check for retired external dependency references |
+| `python -m build sdk` + `python -m build server` | Build both Python wheels |
+| `(cd dashboard && npx playwright test --project=chromium)` | Chromium Playwright smoke test |
 
 Direct verification commands used in CI are:
 
@@ -264,7 +259,7 @@ Grafana are optional integration surfaces, never default requirements.
 
 ## Evidence and portfolio review
 
-`make evidence` runs the fixed SQLite/in-memory scenario, including canonical
+`python scripts/portfolio_demo.py` runs the fixed SQLite/in-memory scenario, including canonical
 ingestion, OTLP metadata, sampling, cost attribution, alert state, RBAC,
 redaction, replay-shaped output, realtime publication, and a dependency-free
 issue-to-draft-PR scenario. That scenario proves path and protected-branch

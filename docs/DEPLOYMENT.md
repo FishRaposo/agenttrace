@@ -13,7 +13,7 @@ This starts:
 - **AgentTrace Dashboard** (Next.js on port 3000)
 
 The server creates or migrates the database on first boot and seeds demo data if
-the database is empty. Docker/PostgreSQL are optional; `make install` plus
+the database is empty. Docker/PostgreSQL are optional; the install commands above are sufficient.
 SQLite is the canonical offline path.
 
 ## Environment Variables

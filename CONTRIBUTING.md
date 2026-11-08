@@ -50,13 +50,16 @@ Next.js + Tailwind + Recharts application:
 
 ```bash
 # Install all declared dependencies
-make install
+python -m pip install -r server/requirements-lock.txt
+python -m pip install --no-deps -e sdk -e server
+(cd dashboard && npm ci)
 
 # Run the offline evidence contract
-make evidence
+python scripts/portfolio_demo.py
+python scripts/verify_portfolio_evidence.py
 
 # Start the development server
-make dev
+(cd server && uvicorn app.main:app --reload --port 8000)
 ```
 
 The server will be available at `http://localhost:8000` and the dashboard at `http://localhost:3000`.
@@ -138,7 +141,7 @@ npm ci
 5. **Run all E2E tests** after changes:
 
    ```bash
-   make dashboard-test
+   (cd dashboard && npx playwright test --project=chromium)
    ```
 
 ---
@@ -148,7 +151,7 @@ npm ci
 ### SDK Unit Tests
 
 ```bash
-make sdk-test
+(cd sdk && python -m pytest -q)
 # or: cd sdk && python -m pytest tests/ -v
 ```
 
@@ -157,7 +160,7 @@ Tests are in `sdk/tests/` using standard `pytest`. Fixtures are defined in `sdk/
 ### Server Integration Tests
 
 ```bash
-make server-test
+(cd server && python -m pytest -q)
 # or: cd server && python -m pytest tests/ -v
 ```
 
@@ -166,10 +169,10 @@ Server tests use `pytest-asyncio` with an in-memory SQLite database and `httpx.A
 ### Playwright E2E Tests
 
 ```bash
-make test
-# includes sdk-test and server-test only
-make dashboard-test
-# or: cd dashboard && npx playwright test --project=chromium
+(cd sdk && python -m pytest -q)
+(cd server && python -m pytest -q)
+# E2E only:
+(cd dashboard && npx playwright test --project=chromium)
 ```
 
 Dashboard E2E tests are in `dashboard/e2e/`. Install Playwright browsers first:
@@ -181,10 +184,11 @@ cd dashboard && npx playwright install --with-deps
 ### Running All Tests
 
 ```bash
-make test
+(cd sdk && python -m pytest -q)
+(cd server && python -m pytest -q)
 ```
 
-This runs SDK and server tests. Dashboard E2E tests run separately with `make dashboard-test`.
+This runs SDK and server tests. Dashboard E2E tests run separately with `(cd dashboard && npx playwright test --project=chromium)`.
 
 ---
 
@@ -196,19 +200,20 @@ This runs SDK and server tests. Dashboard E2E tests run separately with `make da
 4. **Run linting and type checking**:
 
    ```bash
-   make lint
+   ruff check server/app sdk/agenttrace examples server/tests sdk/tests
    ```
 
 5. **Run formatting**:
 
    ```bash
-   make format
+   ruff format server/app sdk/agenttrace examples server/tests sdk/tests
    ```
 
 6. **Run all tests**:
 
    ```bash
-   make test
+   (cd sdk && python -m pytest -q)
+   (cd server && python -m pytest -q)
    ```
 
 7. **Commit with a descriptive message** following conventional commits (`feat:`, `fix:`, `docs:`, `test:`, `chore:`).

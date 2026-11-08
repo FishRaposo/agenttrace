@@ -15,7 +15,7 @@ explicitly bounded:
 | Stateful local alerting | Delivered locally | `docs/ALERTING.md`, alert state tests |
 | RBAC and redacted audit | Delivered locally | `docs/RBAC_AUDIT.md`, role-matrix tests |
 | Grafana artifact | Delivered locally | `monitoring/grafana/agenttrace-overview.json` |
-| Reproducible evidence | Delivered | `docs/EVIDENCE.md`, `make evidence` |
+| Reproducible evidence | Delivered | `docs/EVIDENCE.md`, `python scripts/portfolio_demo.py` + `python scripts/verify_portfolio_evidence.py` |
 | Safety-bounded issue-to-draft-PR SDK | Delivered locally | `agenttrace.issue_pr`, SDK tests, evidence fixture |
 | Live issue/PR providers and server routes | Deferred | GitHub/LLM/database/worker integrations remain optional |
 | Hosted/team workflows | Deferred | Product scope, no hosted service |

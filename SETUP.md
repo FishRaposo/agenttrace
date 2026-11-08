@@ -34,14 +34,16 @@ dashboard runs at `http://localhost:3000`.
 ## Offline proof
 
 ```bash
-make demo
-make evidence
-make test
-make lint
-make typecheck
+python examples/run_demo.py
+python scripts/portfolio_demo.py
+python scripts/verify_portfolio_evidence.py
+(cd sdk && python -m pytest -q)
+(cd server && python -m pytest -q)
+ruff check server/app sdk/agenttrace examples server/tests sdk/tests
+python -m pyright server/app sdk/agenttrace
 ```
 
-`make evidence` needs no credentials or network and verifies the normalized
+The evidence commands need no credentials or network and verify the normalized
 golden fixture. See [`docs/EVIDENCE.md`](docs/EVIDENCE.md).
 
 ## SDK smoke example

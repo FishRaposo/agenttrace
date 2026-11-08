@@ -23,7 +23,6 @@ DEFAULT_ALLOWED = (
 DEFAULT_BLOCKED = (
     ".github/**",
     ".env*",
-    "Makefile",
     "pyproject.toml",
     "docker-compose.yml",
     "requirements.txt",

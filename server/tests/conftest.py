@@ -10,7 +10,7 @@ import pytest_asyncio
 
 # The evidence contract tests import the repo-root `scripts/` package, which is
 # only importable when pytest runs from the repository root. Insert it so the
-# suite also collects when invoked from `server/` (CI, `make server-test`).
+# suite also collects when invoked from `server/` (CI, `python -m pytest -q`).
 _REPO_ROOT = str(Path(__file__).resolve().parents[2])
 if _REPO_ROOT not in sys.path:
     sys.path.insert(0, _REPO_ROOT)

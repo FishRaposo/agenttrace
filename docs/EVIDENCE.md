@@ -1,6 +1,6 @@
 # Reproducible portfolio evidence
 
-Run `make evidence` from the repository root. The command executes a fixed
+Run `python scripts/portfolio_demo.py` then `python scripts/verify_portfolio_evidence.py` from the repository root. The commands execute a fixed
 SQLite/in-memory scenario with no credentials or network access and writes an
 ignored bundle to `artifacts/portfolio/agenttrace-evidence/`.
 
