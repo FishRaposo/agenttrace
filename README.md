@@ -8,6 +8,8 @@
 
 **At a glance.** A failing step named inside a set of overlapping requests, with the repair shown beside the failure. See it in three recorded captures: [fishraposo.github.io/agenttrace](https://fishraposo.github.io/agenttrace/). Limits: bundled provider responses and token prices are synthetic, and the UI says so.
 
+Three captures, no install: [the failing step](docs/images/portfolio/trace-01-cover.png) · [a connected run](docs/images/portfolio/trace-02-connected.png) · [twenty overlapping requests](docs/images/portfolio/trace-03-runset.png). Provenance and limits: [docs/images/portfolio](docs/images/portfolio/README.md).
+
 AgentTrace combines a dependency-free tracing SDK, a local collector and a
 visual investigation dashboard. Follow twenty overlapping requests, locate a
 retrieval failure, and compare its repair while the separate timeout and
