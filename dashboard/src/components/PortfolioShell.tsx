@@ -67,7 +67,7 @@ export function PortfolioShell({ children }: { children: React.ReactNode }) {
         Skip to content
       </a>
       <header className="app-header">
-        <Link className="brand" href="/">
+        <Link prefetch={false} className="brand" href="/">
           <span className="brand-mark">
             <Activity size={21} />
           </span>
@@ -87,7 +87,7 @@ export function PortfolioShell({ children }: { children: React.ReactNode }) {
       <div className="workspace-bar">
         <nav aria-label="Main navigation">
           {nav.map((item) => (
-            <Link
+            <Link prefetch={false}
               key={item.href}
               className={
                 pathname === item.href ||
@@ -212,7 +212,7 @@ export function PortfolioShell({ children }: { children: React.ReactNode }) {
             <p>{tour[state.tour].body}</p>
           </div>
           <div className="button-row">
-            <Link className="button" href={tour[state.tour].href}>
+            <Link prefetch={false} className="button" href={tour[state.tour].href}>
               Open step
               <ChevronRight size={15} />
             </Link>
@@ -245,7 +245,7 @@ export function PortfolioShell({ children }: { children: React.ReactNode }) {
       <footer>
         <Radio size={14} />
         <span>Inspectable evidence. Bounded telemetry. Honest outcomes.</span>
-        <Link href="/workflow">SDK, setup & evidence →</Link>
+        <Link prefetch={false} href="/workflow">SDK, setup & evidence →</Link>
       </footer>
     </div>
   );

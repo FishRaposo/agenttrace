@@ -374,7 +374,7 @@ export function RunRows({ runs }: { runs: Run[] }) {
   return (
     <div className="run-list">
       {runs.map((run) => (
-        <Link
+        <Link prefetch={false}
           data-testid="run-row"
           href={`/runs/${run.id}`}
           key={run.id}
@@ -429,7 +429,7 @@ export function RequestLanes({ runs }: { runs: Run[] }) {
               100,
           );
           return (
-            <Link
+            <Link prefetch={false}
               href={`/runs/${run.id}`}
               key={run.id}
               className="lane"
@@ -485,7 +485,7 @@ export function OverviewView() {
               Investigate a failure
               <ArrowRight size={16} />
             </button>
-            <Link className="button" href="/runs">
+            <Link prefetch={false} className="button" href="/runs">
               Explore traces
             </Link>
           </div>
@@ -522,7 +522,7 @@ export function OverviewView() {
               <section className="panel">
                 <div className="section-heading">
                   <h2>Start with the unexpected outcomes</h2>
-                  <Link href="/runs">All requests →</Link>
+                  <Link prefetch={false} href="/runs">All requests →</Link>
                 </div>
                 <RunRows
                   runs={[
@@ -541,7 +541,7 @@ export function OverviewView() {
                 Launch the bundled workload above or connect your independently
                 installed SDK.
               </p>
-              <Link href="/workflow">Actual project quick start →</Link>
+              <Link prefetch={false} href="/workflow">Actual project quick start →</Link>
             </section>
           )}
         </>
@@ -1037,7 +1037,7 @@ export function RunDetailView() {
   }, [params.id, state.source]);
   return (
     <>
-      <Link className="back-link" href="/runs">
+      <Link prefetch={false} className="back-link" href="/runs">
         ← All runs
       </Link>
       <ReadState loading={run.loading} error={run.error} retry={run.retry} />
@@ -1342,7 +1342,7 @@ export function LiveView() {
               >
                 <span className="event-index">{i + 1}</span>
                 <div>
-                  <Link href={`/runs/${event.run_id}`}>{event.name}</Link>
+                  <Link prefetch={false} href={`/runs/${event.run_id}`}>{event.name}</Link>
                   <small>
                     {event.run_id} · {event.span_type}
                   </small>
