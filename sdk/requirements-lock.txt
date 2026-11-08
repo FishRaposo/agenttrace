@@ -4,7 +4,7 @@ ast-serialize==0.13.1
     # via mypy
 colorama==0.4.6 ; sys_platform == 'win32'
     # via pytest
-coverage==7.17.0
+coverage==7.17.2
     # via pytest-cov
 iniconfig==2.3.1
     # via pytest
@@ -12,9 +12,9 @@ librt==0.16.0 ; platform_python_implementation != 'PyPy'
     # via mypy
 mypy==2.4.1
     # via agenttrace (pyproject.toml)
-mypy-extensions==1.1.0
+mypy-extensions==1.2.0
     # via mypy
-nodeenv==1.11.1
+nodeenv==1.12.0
     # via pyright
 packaging==26.3
     # via pytest
@@ -34,7 +34,7 @@ pytest==9.2.0
     #   pytest-cov
 pytest-cov==7.1.0
     # via agenttrace (pyproject.toml)
-ruff==0.17.3
+ruff==0.17.4
     # via agenttrace (pyproject.toml)
 typing-extensions==4.16.0
     # via
