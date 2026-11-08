@@ -63,7 +63,11 @@ export function CostBreakdown({ spans }: CostBreakdownProps): JSX.Element {
       ) : (
         <div>
           <div className="h-48 mb-4">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 1, height: 1 }}
+            >
               <BarChart data={groups} margin={{ top: 5, right: 5, left: 5, bottom: 5 }}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f3f4f6" />
                 <XAxis

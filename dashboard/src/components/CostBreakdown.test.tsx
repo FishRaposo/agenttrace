@@ -14,6 +14,6 @@ describe("CostBreakdown", () => {
     expect(screen.getByText("Cost Breakdown")).toBeInTheDocument();
     expect(screen.getByText("Total")).toBeInTheDocument();
     // demoSpans include LLM and tool/decision span types
-    expect(screen.getByText(/LLM Calls/)).toBeInTheDocument();
+    expect(screen.getByText(/LLM Calls \(\d+\)/)).toBeInTheDocument();
   });
 });

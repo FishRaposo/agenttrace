@@ -96,7 +96,11 @@ export function TokenUsage({ spans }: TokenUsageProps): JSX.Element {
       ) : (
         <div>
           <div className="h-48 mb-4">
-            <ResponsiveContainer width="100%" height="100%">
+            <ResponsiveContainer
+              width="100%"
+              height="100%"
+              initialDimension={{ width: 1, height: 1 }}
+            >
               <BarChart
                 data={groups}
                 margin={{ top: 5, right: 5, left: 5, bottom: 5 }}
