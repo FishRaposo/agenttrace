@@ -11,7 +11,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:e2e": "playwright test",
-    "test:e2e:live": "playwright test --config playwright.live.config.ts"
+    "test:e2e:live": "playwright test --config playwright.live.config.ts",
+    "demo:static": "cross-env NEXT_STATIC_EXPORT=1 NEXT_BASE_PATH=/trace-demo NEXT_PUBLIC_DEMO_MODE=1 next build"
   },
   "dependencies": {
     "lucide-react": "^1.64.0",
