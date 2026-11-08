@@ -213,3 +213,18 @@ wheel isolation, Docker build, and the new `connected-live` job running the
 HTTP integrity verifiers and connected Playwright suite against a real
 collector on Linux. Post-merge `main` run identifiers are recorded in the
 parent index.
+
+## Browser demo — verified 2026-11-08
+
+`https://fishraposo.github.io/trace-demo/` is the dashboard built as a **Next static export** in demo
+mode (`NEXT_STATIC_EXPORT=1 NEXT_BASE_PATH=/trace-demo NEXT_PUBLIC_DEMO_MODE=1`, script `demo:static`).
+No backend, no keys, no hosting.
+
+Verified in a headless browser against the live URL: the sample banner renders, the home view lists the
+cohort, `runs/sample-incident-request-18/` shows the failing `retrieve` span with its duration, **no
+request leaves `fishraposo.github.io`**, and the console is clean.
+
+Two constraints worth knowing. `runs/[id]` is a client view, so the page must stay a server component
+that renders it — re-exporting the client component as the page default made Next report
+`generateStaticParams` missing even when it was exported. And the ids come from the sample cohort
+pattern (two scenarios × twenty requests); Pages needs `.nojekyll` or every `/_next/**` asset 404s.

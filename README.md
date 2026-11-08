@@ -21,7 +21,7 @@ raw content requires explicit opt-in. See [capture/security](docs/SECURITY.md),
 [actual setup](docs/portfolio-connected.md), [case study](docs/portfolio-case-study.md),
 [verification](docs/portfolio-verification.md) and [review walkthrough](docs/portfolio-walkthrough.md).
 
-**See it without installing:** [three captures from the recorded runs](https://fishraposo.github.io/agenttrace/) — the failing span, the repair beside it, and twenty overlapping requests, with the real-versus-synthetic split stated.
+**Try it without installing:** **[the dashboard, running in your browser](https://fishraposo.github.io/trace-demo/)** — the failing span, the repaired cohort, the cost view. The three captures of the recorded runs are at [fishraposo.github.io/agenttrace](https://fishraposo.github.io/agenttrace/) — the failing span, the repair beside it, and twenty overlapping requests, with the real-versus-synthetic split stated.
 The CI badge tracks upstream `main`; the release candidate's verification is local.
 (GitHub's aggregate commit status on `main` can read "pending"/"failure" from stale
 Dependabot-only contexts; the workflow's own checks — lint, dashboard build, Docker,
