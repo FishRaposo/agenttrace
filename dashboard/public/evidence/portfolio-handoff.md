@@ -9,7 +9,7 @@ unchanged. No mandatory sibling-project dependency was added.
 
 ## Read in this order
 
-1. [README](../README.md) and [three-minute walkthrough](portfolio-walkthrough.md).
+1. [README](../../../README.md) and [three-minute walkthrough](portfolio-walkthrough.md).
 2. [Actual workflow/setup](portfolio-connected.md), [baseline](portfolio-baseline.md)
    and [case study](portfolio-case-study.md).
 3. [Verification and limitations](portfolio-verification.md), committed
@@ -19,8 +19,7 @@ unchanged. No mandatory sibling-project dependency was added.
    [raw benchmark](evidence/tracing-benchmark.json) and [screenshots](screenshots/README.md).
 4. [Architecture](ARCHITECTURE.md), [security/capture](SECURITY.md),
    [SDK](SDK.md), [playback](REPLAY.md) and [pinned GenAI mapping](GENAI_CONVENTIONS.md).
-5. External [project plan](../../plans/agenttrace.md) and
-   [portfolio index](../../PORTFOLIO_PLAN.md) before choosing another project.
+5. External project plan and portfolio index (owner documents) before choosing another project.
 
 ## Delivered and checked
 
