@@ -16,6 +16,8 @@ This is the **0.2.0 release candidate**. Capture defaults change to summaries;
 raw content requires explicit opt-in. See [capture/security](docs/SECURITY.md),
 [actual setup](docs/portfolio-connected.md), [case study](docs/portfolio-case-study.md),
 [verification](docs/portfolio-verification.md) and [review walkthrough](docs/portfolio-walkthrough.md).
+
+**See it without installing:** [three captures from the recorded runs](https://fishraposo.github.io/agenttrace/) — the failing span, the repair beside it, and twenty overlapping requests, with the real-versus-synthetic split stated.
 The CI badge tracks upstream `main`; the release candidate's verification is local.
 (GitHub's aggregate commit status on `main` can read "pending"/"failure" from stale
 Dependabot-only contexts; the workflow's own checks — lint, dashboard build, Docker,
