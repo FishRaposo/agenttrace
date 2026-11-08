@@ -6,6 +6,8 @@
 
 **Find the failing step in an AI workflow, even when requests overlap.**
 
+**At a glance.** A failing step named inside a set of overlapping requests, with the repair shown beside the failure. See it in three recorded captures: [fishraposo.github.io/agenttrace](https://fishraposo.github.io/agenttrace/). Limits: bundled provider responses and token prices are synthetic, and the UI says so.
+
 AgentTrace combines a dependency-free tracing SDK, a local collector and a
 visual investigation dashboard. Follow twenty overlapping requests, locate a
 retrieval failure, and compare its repair while the separate timeout and
