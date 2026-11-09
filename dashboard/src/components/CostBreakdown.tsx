@@ -73,10 +73,10 @@ export function CostBreakdown({ spans }: CostBreakdownProps): JSX.Element {
                 <XAxis
                   dataKey="type"
                   tickFormatter={getTypeLabel}
-                  tick={{ fontSize: 11, fill: "#6b7280" }}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
                 />
                 <YAxis
-                  tick={{ fontSize: 11, fill: "#6b7280" }}
+                  tick={{ fontSize: 12, fill: "#6b7280" }}
                   tickFormatter={(v) => `$${v.toFixed(3)}`}
                 />
                 <Tooltip

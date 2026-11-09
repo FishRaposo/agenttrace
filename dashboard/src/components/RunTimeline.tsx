@@ -125,7 +125,7 @@ function SpanRow({
                   {span.name}
                 </span>
                 {span.cost_usd ? (
-                  <span className="ml-auto text-[10px] text-white/90 font-mono shrink-0">
+                  <span className="ml-auto text-xs text-white/90 font-mono shrink-0">
                     {formatCost(span.cost_usd)}
                   </span>
                 ) : null}
@@ -138,14 +138,14 @@ function SpanRow({
         {/* Cost contribution */}
         <div className="w-20 text-right shrink-0">
           {costPct > 0 ? (
-            <span className="text-[10px] text-gray-400 font-mono">
+            <span className="text-xs text-gray-400 font-mono">
               {costPct.toFixed(1)}%
             </span>
           ) : null}
         </div>
 
         {/* Type badge */}
-        <span className="text-[10px] font-mono text-gray-400 shrink-0 uppercase">
+        <span className="text-xs font-mono text-gray-400 shrink-0 uppercase">
           {span.span_type}
         </span>
       </div>

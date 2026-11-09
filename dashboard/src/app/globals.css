@@ -118,7 +118,7 @@ p {
 }
 small,
 .eyebrow {
-  font-size: 10px;
+  font-size:12px;
   letter-spacing: 0.09em;
   font-weight: 700;
 }
@@ -191,7 +191,7 @@ progress {
 }
 .brand small {
   display: block;
-  font-size: 8px;
+  font-size:12px;
   color: var(--muted);
   letter-spacing: 0.13em;
 }
@@ -207,13 +207,13 @@ progress {
 .release-tag {
   margin-left: auto;
   color: var(--muted);
-  font-size: 11px;
+  font-size:12px;
   border: 1px solid var(--line);
   padding: 5px 10px;
   border-radius: 30px;
 }
 .icon-button {
-  font-size: 11px;
+  font-size:12px;
   min-height: 32px;
   padding: 5px 10px;
 }
@@ -255,7 +255,7 @@ nav a.active {
   align-items: center;
   gap: 10px;
   padding: 12px 4%;
-  font-size: 11px;
+  font-size:12px;
   border-bottom: 1px solid var(--line);
   background: #eef5f3;
 }
@@ -270,7 +270,7 @@ nav a.active {
   margin-left: auto;
   padding: 3px 9px;
   min-height: 30px;
-  font-size: 11px;
+  font-size:12px;
   background: transparent;
 }
 .source-dot,
@@ -290,7 +290,7 @@ nav a.active {
   align-items: center;
   gap: 20px;
   padding: 13px 4%;
-  font-size: 11px;
+  font-size:12px;
   border-bottom: 1px solid var(--line);
 }
 .context-bar label {
@@ -302,7 +302,7 @@ nav a.active {
 .context-bar select {
   max-width: 370px;
   min-height: 32px;
-  font-size: 11px;
+  font-size:12px;
 }
 .context-bar > span {
   color: var(--muted);
@@ -321,7 +321,7 @@ footer {
   border-top: 1px solid var(--line);
   padding: 25px 4%;
   color: var(--muted);
-  font-size: 11px;
+  font-size:12px;
 }
 footer a {
   margin-left: auto;
@@ -360,7 +360,7 @@ footer a {
   min-width: 0;
 }
 .hero-proof > span {
-  font-size: 8px;
+  font-size:12px;
   letter-spacing: 0.06em;
   color: #8fc7b9;
 }
@@ -436,11 +436,11 @@ footer a {
   white-space: nowrap;
 }
 .section-heading > span {
-  font-size: 11px;
+  font-size:12px;
   color: var(--muted);
 }
 .subtle {
-  font-size: 11px;
+  font-size:12px;
   color: var(--muted);
 }
 .metric-grid {
@@ -458,7 +458,7 @@ footer a {
 }
 .metric-grid small {
   color: var(--muted);
-  font-size: 9px;
+  font-size:12px;
 }
 .metric-grid strong {
   font-size: 35px;
@@ -468,7 +468,7 @@ footer a {
   letter-spacing: -0.05em;
 }
 .metric-grid span {
-  font-size: 10px;
+  font-size:12px;
   color: var(--muted);
 }
 .metric-grid .small-metric {
@@ -488,7 +488,7 @@ footer a {
   gap: 6px;
   border: 1px solid var(--line);
   padding: 3px 8px;
-  font-size: 10px;
+  font-size:12px;
   border-radius: 25px;
   color: var(--muted);
   white-space: nowrap;
@@ -529,7 +529,7 @@ footer a {
   gap: 15px;
   padding: 17px 7px;
   border-bottom: 1px solid var(--line);
-  font-size: 11px;
+  font-size:12px;
 }
 .run-row:hover {
   background: var(--canvas);
@@ -540,7 +540,7 @@ footer a {
   overflow-wrap: anywhere;
 }
 .run-ident small {
-  font-size: 9px;
+  font-size:12px;
   color: var(--muted);
   font-weight: 400;
   letter-spacing: 0;
@@ -558,7 +558,7 @@ footer a {
   grid-template-columns: 110px 1fr 95px;
   align-items: center;
   gap: 14px;
-  font-size: 11px;
+  font-size:12px;
   padding: 3px 5px;
   border-radius: 4px;
 }
@@ -618,7 +618,7 @@ footer a {
   flex-wrap: wrap;
 }
 .filter-buttons button {
-  font-size: 11px;
+  font-size:12px;
   min-height: 36px;
   padding: 6px 11px;
 }
@@ -698,7 +698,7 @@ footer a {
   text-align: left;
   gap: 15px;
   padding: 9px 12px;
-  font-size: 11px;
+  font-size:12px;
   font-weight: 400;
 }
 .waterfall-row[aria-pressed="true"] {
@@ -754,7 +754,7 @@ footer a {
 }
 .stage-list small {
   color: var(--muted);
-  font-size: 9px;
+  font-size:12px;
   letter-spacing: 0;
   font-weight: 400;
 }
@@ -769,7 +769,7 @@ footer a {
   background: var(--canvas);
   display: grid;
   place-items: center;
-  font-size: 10px;
+  font-size:12px;
   flex-shrink: 0;
 }
 .span-inspector {
@@ -782,7 +782,7 @@ footer a {
   display: grid;
   grid-template-columns: 80px minmax(0, 1fr);
   gap: 8px;
-  font-size: 10px;
+  font-size:12px;
 }
 .identity-list dt {
   color: var(--muted);
@@ -816,11 +816,11 @@ table {
   border-collapse: collapse;
   text-align: left;
   width: 100%;
-  font-size: 11px;
+  font-size:12px;
 }
 th {
   color: var(--muted);
-  font-size: 10px;
+  font-size:12px;
   white-space: nowrap;
 }
 th,
@@ -860,7 +860,7 @@ td {
 }
 .event-list small {
   display: block;
-  font-size: 9px;
+  font-size:12px;
   font-weight: 400;
   letter-spacing: 0;
   color: var(--muted);
@@ -874,7 +874,7 @@ td {
 }
 .event-index {
   color: var(--muted);
-  font: 10px Consolas;
+  font: 12px Consolas;
 }
 .tour-card {
   max-width: 1200px;
@@ -1046,13 +1046,13 @@ td {
   .source-bar > span:not(.source-dot) {
     order: 4;
     flex-basis: 100%;
-    font-size: 10px;
+    font-size:12px;
   }
   .source-bar strong {
-    font-size: 11px;
+    font-size:12px;
   }
   .source-bar button {
-    font-size: 10px;
+    font-size:12px;
   }
   .context-bar {
     padding: 12px 5%;
@@ -1069,7 +1069,7 @@ td {
   }
   .context-bar > span {
     max-width: 100%;
-    font-size: 10px;
+    font-size:12px;
   }
   main {
     padding: 25px 5% 45px;
@@ -1100,14 +1100,14 @@ td {
   }
   .hero-proof > span {
     grid-column: 1/-1;
-    font-size: 7px;
+    font-size:12px;
   }
   .hero-proof strong {
     font-size: 21px;
     margin: 0;
   }
   .hero-proof p {
-    font-size: 10px;
+    font-size:12px;
   }
   .metric-grid {
     grid-template-columns: 1fr 1fr;
@@ -1120,10 +1120,10 @@ td {
     font-size: 30px;
   }
   .metric-grid small {
-    font-size: 8px;
+    font-size:12px;
   }
   .metric-grid span {
-    font-size: 9px;
+    font-size:12px;
   }
   .panel {
     padding: 18px;
@@ -1154,15 +1154,15 @@ td {
     font-size: 12px;
   }
   .run-ident small {
-    font-size: 8px;
+    font-size:12px;
   }
   .lane {
     grid-template-columns: 78px minmax(0, 1fr) 83px;
     gap: 8px;
-    font-size: 9px;
+    font-size:12px;
   }
   .lane .outcome {
-    font-size: 8px;
+    font-size:12px;
     padding: 2px 5px;
   }
   .lane-track {
@@ -1188,20 +1188,20 @@ td {
     gap: 4px;
   }
   .filter-buttons button {
-    font-size: 10px;
+    font-size:12px;
     padding: 6px 9px;
   }
   .tabs {
     gap: 5px;
   }
   .tabs button {
-    font-size: 11px;
+    font-size:12px;
     padding: 8px 10px;
   }
   .waterfall-row {
     grid-template-columns: 80px minmax(0, 1fr) 46px;
     gap: 6px;
-    font-size: 9px;
+    font-size:12px;
     padding: 9px 7px;
   }
   .investigation-grid,
@@ -1213,7 +1213,7 @@ td {
     padding: 15px;
   }
   .identity-list {
-    font-size: 9px;
+    font-size:12px;
   }
   .comparison-head {
     gap: 10px;
@@ -1233,17 +1233,17 @@ td {
   }
   .tour-card .button-row button,
   .tour-card .button-row .button {
-    font-size: 11px;
+    font-size:12px;
     padding: 7px 10px;
   }
   .event-list li {
     gap: 10px;
   }
   .event-list .outcome {
-    font-size: 9px;
+    font-size:12px;
   }
   .event-list details summary {
-    font-size: 10px;
+    font-size:12px;
   }
   .launcher .button-row {
     align-items: stretch;
@@ -1253,14 +1253,14 @@ td {
   }
   .launcher .button-row button {
     flex: 1;
-    font-size: 11px;
+    font-size:12px;
   }
   .button-row {
     gap: 8px;
   }
   .hero .button-row button,
   .hero .button-row .button {
-    font-size: 11px;
+    font-size:12px;
     padding: 10px 12px;
   }
   .workflow-steps {
@@ -1272,16 +1272,16 @@ td {
   footer {
     padding: 20px 5%;
     flex-wrap: wrap;
-    font-size: 10px;
+    font-size:12px;
   }
   footer a {
     margin-left: 24px;
   }
   pre {
-    font-size: 10px;
+    font-size:12px;
   }
   table {
-    font-size: 10px;
+    font-size:12px;
   }
   th,
   td {
@@ -1328,3 +1328,19 @@ input:focus-visible,
 summary:focus-visible {
   outline-color: #b76a12;
 }
+
+/* Access floor: controls, lane rows and footer links. */
+button, .button, .icon-button, input, select { min-height:44px; }
+.icon-button { min-width:44px; font-size:12px; }
+nav a { min-width:44px; }
+.filter-buttons button, .tabs button, .waterfall-row, .lane, .back-link, footer a, .section-heading > a { min-height:44px; }
+.back-link, footer a, .section-heading > a { display:inline-flex; align-items:center; }
+.lane, .waterfall-row { padding-top:9px; padding-bottom:9px; }
+.source-bar button, .inline-label select, .context-bar select, .button-row a, details summary { min-height:44px; min-width:44px; }
+.button-row a, details summary { display:inline-flex; align-items:center; }
+@media (max-width:767px) { input, select, textarea { font-size:1rem; } }
+@media (prefers-reduced-motion: reduce) { *, *::before, *::after { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
+
+table a { display:inline-flex; min-height:44px; align-items:center; }
+
+.event-list a { display:inline-flex; min-height:44px; align-items:center; }
