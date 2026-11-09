@@ -162,8 +162,8 @@ Useful targets:
 | Command | Purpose |
 | --- | --- |
 | `(cd sdk && python -m pytest -q)` + `(cd server && python -m pytest -q)` | SDK and server pytest suites |
-| `ruff check server/app sdk/agenttrace examples server/tests sdk/tests` | Ruff checks |
-| `ruff format server/app sdk/agenttrace examples server/tests sdk/tests` | Ruff formatting |
+| `ruff check server/app sdk/agenttrace examples server/tests sdk/tests scripts` | Ruff checks |
+| `ruff format server/app sdk/agenttrace examples server/tests sdk/tests scripts` | Ruff formatting |
 | `python -m pyright server/app sdk/agenttrace` | Pyright for SDK and server |
 | `(cd dashboard && npm run demo:ui)` | Dashboard in forced portfolio demo mode (no backend) |
 | `python scripts/portfolio_demo.py` + `python scripts/verify_portfolio_evidence.py` | Build and verify the offline evidence bundle |
@@ -171,19 +171,19 @@ Useful targets:
 | `python -m build sdk` + `python -m build server` | Build both Python wheels |
 | `(cd dashboard && npx playwright test --project=chromium)` | Chromium Playwright smoke test |
 
-Direct verification commands used in CI are:
+Local verification commands:
 
 ```bash
 pytest sdk/tests -q
 pytest server/tests -q
-ruff check server/app sdk/agenttrace server/tests sdk/tests
-ruff format --check server/app sdk/agenttrace server/tests sdk/tests
+ruff check server/app sdk/agenttrace examples server/tests sdk/tests scripts
+ruff format --check server/app sdk/agenttrace examples server/tests sdk/tests scripts
 pyright server/app sdk/agenttrace
 ```
 
-The absorption branch currently executes 132 SDK tests and 98 server tests. The
-dashboard adds 29 Vitest unit tests and 12 Playwright Chromium smoke tests in
-CI (`npm test`, `npm run test:e2e -- --project=chromium`).
+The current tree executes 174 SDK tests and 142 server tests. The dashboard adds
+41 Vitest unit tests and the Chromium Playwright smoke suite in CI
+(`npm test`, `npm run test:e2e -- --project=chromium`).
 
 ## SDK example
 

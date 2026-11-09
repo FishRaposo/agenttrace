@@ -8,7 +8,7 @@
 
 ## Server
 
-- Development: `cd server && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000`
+- Development: `cd server && uvicorn app.main:app --reload --host 127.0.0.1 --port 8000`
 - Health: `http://localhost:8000/health`
 - API docs: `http://localhost:8000/docs`
 - Evidence: `python scripts/portfolio_demo.py` then `python scripts/verify_portfolio_evidence.py`

@@ -72,7 +72,7 @@ real provider credentials are opt-in.
 
 ## Delivered engineering surface
 
-The0.2.0 release candidate adds per-tracer context ownership, lifecycle ASGI
+The 0.2.0 release candidate adds per-tracer context ownership, lifecycle ASGI
 instrumentation, bounded/sanitized export and the packaged `agenttrace.portfolio`
 workload. Capture defaults to summaries; raw content is opt-in. The optional
 collector launcher is explicitly enabled, accepts only bundled scenarios and
@@ -80,7 +80,7 @@ persists execution state. Dashboard/CLI launches share that SDK implementation.
 Recorded playback stays read-only. See `docs/portfolio-connected.md` and the
 dated verification report before extending public claims.
 
-Use disposable databases and dedicated ports8300/3404 for portfolio acceptance;
+Use disposable databases and dedicated ports 8300/3404 for portfolio acceptance;
 preserve other projects and owner's data. Never build Next concurrently with
 browser checks. Keep sample and connected tests separate; connected success
 must use actual collector responses, sample journeys assert zero external calls.

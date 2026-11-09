@@ -37,7 +37,7 @@ invalid tokens still fail with `401`.
 Keep `SECRET_KEY`, database credentials, and provider keys in environment
 variables. Never commit `.env` files. Audit metadata recursively removes
 passwords, bearer tokens, API keys, authorization headers, and password hashes.
-The0.2.0 release candidate defaults SDK capture to summaries. Raw content is an
+The 0.2.0 release candidate defaults SDK capture to summaries. Raw content is an
 explicit opt-in. Supported credential keys/patterns are redacted before export
 and new persistence; historical values are redacted on presentation. Bounded
 depth and event sizes limit capture. This is not comprehensive PII detection:
